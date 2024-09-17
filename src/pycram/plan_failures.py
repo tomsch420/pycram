@@ -395,3 +395,6 @@ class ReasoningError(PlanFailure):
 class CollisionError(PlanFailure):
     def __init__(*args, **kwargs):
         super().__init__(*args, **kwargs)
+
+class OntologyNotLoadedError(AttributeError):
+    ...

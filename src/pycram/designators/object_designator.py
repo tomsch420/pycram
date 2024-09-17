@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import dataclasses
+from functools import cached_property
+
+from cachetools import cached
 from typing_extensions import List, Optional, Callable, TYPE_CHECKING
 import sqlalchemy.orm
 from ..datastructures.world import World
@@ -10,6 +13,7 @@ from ..orm.base import ProcessMetaData
 from ..orm.object_designator import (BelieveObject as ORMBelieveObject, ObjectPart as ORMObjectPart)
 from ..datastructures.pose import Pose
 from ..external_interfaces.robokudo import *
+from ..ontology.ontology import OntologyWorld, WorldOntologyManager
 
 if TYPE_CHECKING:
     import owlready2
@@ -109,14 +113,23 @@ class OntologyObject(ObjectDesignatorDescription):
     Class for objects that are described by ontological concepts.
     """
 
-    def __init__(self, concepts: Optional[List[owlready2.Thing]]):
-        self.ontology_concept_holders = concepts
+    def __init__(self, concepts: List[owlready2.Thing]):
+        self.concepts = concepts
 
-    def get_all_individuals_of_concepts(self):
-        result = [individual.name for concept in self.ontology_concept_holders for individual in ABox_onto.individuals()
-                  if concept in individual.is_a]
-        return result
+    @cached_property
+    def individuals(self):
+        return WorldOntologyManager().get_all_individuals_of_concepts(self.concepts)
 
+    def __iter__(self):
+        """
+        Iterates over all designators that are associated with the ontology concepts.
+
+        :yield: A resolved object designator
+        """
+        for obj in World.current_world.objects:
+            for individual in self.individuals:
+                if individual in obj.link_names:
+                    yield obj.links[individual]
 
 class LocatedObject(ObjectDesignatorDescription):
     """

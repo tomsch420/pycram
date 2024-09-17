@@ -2,27 +2,26 @@ from __future__ import annotations
 
 import inspect
 import itertools
-import logging
 import os.path
-
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Type, Tuple, Union
 
+import owlready2
 import rospy
-
 from owlready2 import (Namespace, Ontology, World as OntologyWorld, Thing, EntityClass, Imp,
                        Property, ObjectProperty, OwlReadyError, types,
                        onto_path, default_world, get_namespace, get_ontology, destroy_entity,
                        sync_reasoner_pellet, sync_reasoner_hermit,
                        OwlReadyOntologyParsingError)
 from owlready2.class_construct import GeneralClassAxiom
+from typing_extensions import Iterable
 
 from ..datastructures.enums import ObjectType
-from ..helper import Singleton
 from ..designator import DesignatorDescription, ObjectDesignatorDescription
-
+from ..helper import Singleton
 from ..ontology.ontology_common import (OntologyConceptHolderStore, OntologyConceptHolder,
                                         ONTOLOGY_SQL_BACKEND_FILE_EXTENSION)
+from ..plan_failures import OntologyNotLoadedError
 
 SOMA_HOME_ONTOLOGY_IRI = "http://www.ease-crc.org/ont/SOMA-HOME.owl"
 SOMA_ONTOLOGY_IRI = "http://www.ease-crc.org/ont/SOMA.owl"
@@ -346,7 +345,7 @@ class OntologyManager(object, metaclass=Singleton):
             if os.path.isfile(main_ontology_sql_filename):
                 rospy.loginfo(
                     f"Main ontology world for {self.main_ontology.name} has been cached and saved to SQL: {main_ontology_sql_filename}")
-            #else: it could be using memory cache as SQL backend
+            # else: it could be using memory cache as SQL backend
             return True
 
     def create_ontology_concept_class(self, class_name: str,
@@ -808,6 +807,8 @@ class OntologyManager(object, metaclass=Singleton):
         - https://www.researchgate.net/publication/200758993_Benchmarking_OWL_reasoners
         - https://www.researchgate.net/publication/345959058_OWL2Bench_A_Benchmark_for_OWL_2_Reasoners
 
+        TODO Use conclude
+
         :param world: An owlready2.World to reason about. If None, use :attr:`main_ontology_world`
         :param use_pellet_reasoner: Use Pellet reasoner, otherwise HermiT
         :return: True if the reasoning was successful, otherwise False
@@ -827,3 +828,66 @@ class OntologyManager(object, metaclass=Singleton):
             return False
         rospy.loginfo(f"{reasoner_name} reasoning finishes!")
         return True
+
+
+class WorldOntologyManager(metaclass=Singleton):
+    """
+    A singleton class managing the ontology of the current world.
+    """
+    dul: Ontology = owlready2.get_ontology(
+        "https://raw.githubusercontent.com/Multiverse-Framework/Multiverse/main/multiverse/modules/multiverse_knowledge/owl/DUL.owl")
+    """
+    The DUL ontology
+    """
+
+    usd: Ontology = owlready2.get_ontology(
+        "https://raw.githubusercontent.com/Multiverse-Framework/Multiverse/main/multiverse/modules/multiverse_knowledge/owl/USD.owl")
+    """
+    The USD ontology
+    """
+
+    soma_dfl: Ontology = owlready2.get_ontology(
+        "https://raw.githubusercontent.com/Multiverse-Framework/Multiverse-Tutorials/main/src/ontology/SOMA_DFL.owl")
+    """
+    The SOMA DFL ontology
+    """
+
+    world: Optional[Ontology] = None
+    """
+    The ontology of the current world.
+    """
+
+    def __init__(self):
+        # On the first call of the constructor, load the ontologies.
+        self.load_ontologies()
+
+    def load_ontologies(self):
+        """
+        Load the ontologies.
+        """
+        self.dul.load()
+        self.usd.load()
+        self.soma_dfl.load()
+
+    def assert_world_ontology_loaded(self):
+        if self.world is None:
+            raise OntologyNotLoadedError("The ontology of the current world has not been loaded yet.")
+
+    def load_world_ontology(self, path_to_ontology):
+        """
+        Load the ontology of the current world
+
+        :param path_to_ontology: The path to the ontology file
+        """
+        self.world = owlready2.get_ontology(path_to_ontology)
+        self.world.load()
+
+    def get_all_individuals_of_concepts(self, concepts: Iterable[owlready2.ThingClass]) -> List[str]:
+        """
+        Get all individuals of the given concepts.
+        :param concepts: The concepts to look for.
+        :return: The names of the individuals
+        """
+        result = [individual.name for concept in concepts for individual in self.world.individuals() if
+                  concept in individual.is_a]
+        return result

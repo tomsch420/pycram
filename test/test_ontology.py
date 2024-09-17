@@ -6,9 +6,16 @@ import logging
 from pathlib import Path
 from typing import Type, Optional
 
+from IPython.testing.decorators import skipif
+
+from pycram.datastructures.enums import WorldMode, ObjectType
 from pycram.designator import ObjectDesignatorDescription
 
 import rospy
+
+from pycram.designators.object_designator import OntologyObject
+from pycram.world_concepts.world_object import Object
+from pycram.worlds.bullet_world import BulletWorld
 
 # Owlready2
 try:
@@ -26,7 +33,7 @@ if owlready2:
         java_runtime_installed = False
         rospy.logwarn("Java runtime is not installed, Ontology reasoning unit-test could not run!")
 
-from pycram.ontology.ontology import OntologyManager, SOMA_HOME_ONTOLOGY_IRI, SOMA_ONTOLOGY_IRI
+from pycram.ontology.ontology import OntologyManager, SOMA_HOME_ONTOLOGY_IRI, SOMA_ONTOLOGY_IRI, WorldOntologyManager
 from pycram.ontology.ontology_common import (OntologyConceptHolderStore, OntologyConceptHolder,
                                              ONTOLOGY_SQL_BACKEND_FILE_EXTENSION, ONTOLOGY_OWL_FILE_EXTENSION)
 
@@ -303,6 +310,42 @@ class TestOntologyManager(unittest.TestCase):
         self.assertTrue(self.ontology_manager.save(owl_filepath))
         self.assertTrue(Path(owl_filepath).is_file())
         self.assertTrue(Path(sql_filepath).is_file())
+
+
+@skipif(not owlready2, 'Owlready2 is required')
+class WorldOntologyTestCase(unittest.TestCase):
+
+    def test_world_ontology_loading(self):
+        ontology_manager = WorldOntologyManager()
+        self.assertIsNone(ontology_manager.world)
+        self.assertIsNotNone(ontology_manager.dul)
+        self.assertIsNotNone(ontology_manager.usd)
+        self.assertIsNotNone(ontology_manager.soma_dfl)
+        path_to_ontology = os.path.join("..", "resources", "house_69.owl")
+        path_to_ontology = os.path.abspath(path_to_ontology)
+        ontology_manager.load_world_ontology("file://" + path_to_ontology)
+        self.assertIsNotNone(ontology_manager.world)
+
+
+@skipif(not owlready2, 'Owlready2 is required')
+class OntologyObjectTestCase(unittest.TestCase):
+
+    def test_object(self):
+        ontology_manager = WorldOntologyManager()
+        path_to_ontology = os.path.join("..", "resources", "house_69.owl")
+        path_to_ontology = os.path.abspath(path_to_ontology)
+        ontology_manager.load_world_ontology("file://" + path_to_ontology)
+
+        concepts = list(ontology_manager.world.search(iri="*Furniture"))
+        concepts += list(ontology_manager.world.search(iri="*furniture"))
+
+        world = BulletWorld(WorldMode.DIRECT)
+        house = Object(name="house_69", obj_type=ObjectType.ENVIRONMENT, path="house_69.urdf")
+
+        desig = OntologyObject(concepts)
+        instances = list(iter(desig))
+        self.assertGreater(len(instances), 0)
+        world.exit()
 
 if __name__ == '__main__':
     unittest.main()
