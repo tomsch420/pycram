@@ -104,6 +104,20 @@ class ObjectPart(ObjectDesignatorDescription):
                                   self.part_of.world_object.get_link_pose(name))
 
 
+class OntologyObject(ObjectDesignatorDescription):
+    """
+    Class for objects that are described by ontological concepts.
+    """
+
+    def __init__(self, concepts: Optional[List[owlready2.Thing]]):
+        self.ontology_concept_holders = concepts
+
+    def get_all_individuals_of_concepts(self):
+        result = [individual.name for concept in self.ontology_concept_holders for individual in ABox_onto.individuals()
+                  if concept in individual.is_a]
+        return result
+
+
 class LocatedObject(ObjectDesignatorDescription):
     """
     Description for KnowRob located objects.

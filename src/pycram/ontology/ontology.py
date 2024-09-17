@@ -35,6 +35,39 @@ class OntologyManager(object, metaclass=Singleton):
     Singleton class as the adapter accessing data of an OWL ontology, largely based on owlready2.
     """
 
+    ontologies: Dict[str, Ontology]
+    """
+    A dictionary of OWL ontologies, keyed by ontology name (same as its namespace name), eg. 'SOMA'
+    """
+
+    main_ontology: Optional[Ontology] = None
+    """
+    The main ontology instance created by Ontology Manager at initialization as the result of loading from `main_ontology_iri`
+    """
+
+    soma: Optional[Ontology] = None
+    """
+    The SOMA ontology instance, referencing :attr:`main_ontology` in case of ontology loading from `SOMA.owl`.
+    Ref: http://www.ease-crc.org/ont/SOMA.owl   
+    """
+
+    dul: Optional[Ontology] = None
+    """
+    The DUL ontology instance, referencing :attr:`main_ontology` in case of ontology loading from `DUL.owl`.
+    Ref: http://www.ease-crc.org/ont/DUL.owl
+    """
+
+    main_ontology_world: Optional[OntologyWorld]
+    """
+    The main ontology world, the placeholder of triples created in :attr:`main_ontology`.
+    Ref: https://owlready2.readthedocs.io/en/latest/world.html
+    """
+
+    main_ontology_namespace: Optional[Namespace] = None
+    """
+    Namespace of the main ontology
+    """
+
     def __init__(self, main_ontology_iri: Optional[str] = None, ontology_search_path: Optional[str] = None,
                  use_global_default_world: bool = True):
         """
@@ -49,30 +82,11 @@ class OntologyManager(object, metaclass=Singleton):
         Path(ontology_search_path).mkdir(parents=True, exist_ok=True)
         onto_path.append(ontology_search_path)
 
-        #: A dictionary of OWL ontologies, keyed by ontology name (same as its namespace name), eg. 'SOMA'
-        self.ontologies: Dict[str, Ontology] = {}
-
-        #: The main ontology instance created by Ontology Manager at initialization as the result of loading from `main_ontology_iri`
-        self.main_ontology: Optional[Ontology] = None
-
-        #: The SOMA ontology instance, referencing :attr:`main_ontology` in case of ontology loading from `SOMA.owl`.
-        # Ref: http://www.ease-crc.org/ont/SOMA.owl
-        self.soma: Optional[Ontology] = None
-
-        #: The DUL ontology instance, referencing :attr:`main_ontology` in case of ontology loading from `DUL.owl`.
-        # Ref: http://www.ease-crc.org/ont/DUL.owl
-        self.dul: Optional[Ontology] = None
-
-        #: The main ontology world, the placeholder of triples created in :attr:`main_ontology`.
-        # Ref: https://owlready2.readthedocs.io/en/latest/world.html
-        self.main_ontology_world: Optional[OntologyWorld] = None
+        self.ontologies = {}
 
         #: Ontology IRI (Internationalized Resource Identifier), either a URL to a remote OWL file or the full name path of a local one
         # Ref: https://owlready2.readthedocs.io/en/latest/onto.html
         self.main_ontology_iri: str = main_ontology_iri if main_ontology_iri else SOMA_HOME_ONTOLOGY_IRI
-
-        #: Namespace of the main ontology
-        self.main_ontology_namespace: Optional[Namespace] = None
 
         # Create the main ontology world holding triples
         self.create_main_ontology_world(use_global_default_world=use_global_default_world)
