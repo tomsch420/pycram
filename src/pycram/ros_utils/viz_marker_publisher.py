@@ -367,3 +367,118 @@ class TrajectoryPublisher:
             marker_array.markers.append(marker)
         self.publisher.publish(marker_array)
 
+class TrajectoryMarkerPublisher:
+    """
+    Publishes a trajectory as an array of arrows in RViz.
+    """
+
+    def __init__(self, topic='/pycram/trajectory', frame_id='map'):
+        """
+        Initializes the publisher for trajectory markers.
+
+        :param topic: Name of the marker topic
+        :param frame_id: Frame ID for the markers
+        """
+        self.marker_pub = create_publisher(topic, MarkerArray, queue_size=10)
+        self.marker_array = MarkerArray()
+        self.frame_id = frame_id
+        self.current_id = 0
+
+        self.thread = threading.Thread(target=self._publish)
+        self.thread.start()
+
+    def publish(self, poses, duration_in_seconds: int = 10):
+        """
+        Publishes a trajectory represented as a sequence of arrows.
+
+        :param poses: List of Pose objects defining the trajectory.
+        :param duration_in_seconds: The duration for which the arrows should be displayed.
+        """
+        self.clear_all_markers()
+
+        if len(poses) < 2:
+            logwarn("Trajectory needs at least two poses to create arrows.")
+            return
+
+        self.marker_array.markers.clear()
+
+        for p1, p2 in zip(poses, poses[1:]):
+            arrow_marker = self._create_arrow_marker(p1, p2, duration_in_seconds)
+            self.marker_array.markers.append(arrow_marker)
+
+        if self.thread.is_alive():
+            self.thread.join()
+
+        self.thread = threading.Thread(target=self._publish)
+
+        self.thread.start()
+        self.thread.join()
+
+    def _publish(self):
+        """
+        Publishes the MarkerArray at a fixed interval.
+        """
+        stop_thread = False
+        duration = 1
+        frequency = 0.2
+        start_time = time.time()
+
+        while not stop_thread:
+            if time.time() - start_time > duration:
+                stop_thread = True
+            self.marker_pub.publish(self.marker_array)
+            time.sleep(frequency)
+
+    def _create_arrow_marker(self, start_pose: Pose, end_pose: Pose, duration) -> Marker:
+        """
+        Creates an arrow marker from start_pose to end_pose.
+
+        :param start_pose: The starting pose.
+        :param end_pose: The ending pose.
+        :param duration: The duration for which the arrow should be displayed.
+        :return: A Marker object representing the arrow.
+        """
+        marker = Marker()
+        marker.id = self.current_id
+        marker.header.frame_id = self.frame_id
+        marker.ns = "trajectory_arrows"
+        marker.type = Marker.ARROW
+        marker.action = Marker.ADD
+        marker.lifetime = Duration(duration)
+
+        marker.scale.x = 0.01
+        marker.scale.y = 0.02
+        marker.scale.z = 0.02
+        marker.color.r = 1.0
+        marker.color.g = 0.0
+        marker.color.b = 1.0
+        marker.color.a = 1.0
+
+        start_point = Point()
+        start_point.x = start_pose.position.x
+        start_point.y = start_pose.position.y
+        start_point.z = start_pose.position.z
+
+        end_point = Point()
+        end_point.x = end_pose.position.x
+        end_point.y = end_pose.position.y
+        end_point.z = end_pose.position.z
+
+        marker.points.append(start_point)
+        marker.points.append(end_point)
+
+        self.current_id += 1
+        return marker
+
+    def clear_all_markers(self):
+        """
+        Clears all markers in the MarkerArray and resets the ID counter.
+        """
+        for marker in self.marker_array.markers:
+            marker.action = Marker.DELETE  # Delete each marker
+
+        self.marker_pub.publish(self.marker_array)
+
+        self.marker_array.markers.clear()
+        self.current_id = 0
+

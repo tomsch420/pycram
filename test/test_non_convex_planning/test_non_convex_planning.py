@@ -9,7 +9,7 @@ from random_events.product_algebra import SimpleEvent
 from pycram.datastructures.pose import Pose
 from pycram.failures import PlanFailure
 from pycram.non_convex_planner import ConnectivityGraph, Box, PoseOccupiedError
-from pycram.ros_utils.viz_marker_publisher import TrajectoryPublisher
+from pycram.ros_utils.viz_marker_publisher import TrajectoryPublisher, TrajectoryMarkerPublisher
 from pycram.testing import BulletWorldTestCase
 import plotly.graph_objects as go
 
@@ -75,7 +75,10 @@ class ConnectivityGraphFromWorldTestCase(BulletWorldTestCase):
         target = Pose([-0.9, 0.9, 0.9])
 
         path = cg.path_from_to(start, target)
-        TrajectoryPublisher().visualize_trajectory(path)
+        # TrajectoryPublisher().visualize_trajectory(path)
+        marker = TrajectoryMarkerPublisher()
+        marker.publish(path)
+        time.sleep(10)
         self.assertIsNotNone(path)
         self.assertGreater(len(path), 1)
 
