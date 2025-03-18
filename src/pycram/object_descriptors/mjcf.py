@@ -64,7 +64,7 @@ class LinkDescription(AbstractLinkDescription):
         if mjcf_geometry.type == MJCFGeomType.SPHERE.value:
             return SphereVisualShape(Color(), [0, 0, 0], mjcf_geometry.size[0])
         if mjcf_geometry.type == MJCFGeomType.MESH.value:
-            mesh_filename = mjcf_geometry.mesh.file.prefix + mjcf_geometry.mesh.file.extension
+            mesh_filename = mjcf_geometry.mesh.file_path.prefix + mjcf_geometry.mesh.file_path.extension
             mesh_filename = self.look_for_file_in_mesh_dir(mesh_filename)
             return MeshVisualShape(Color(), [0, 0, 0], mjcf_geometry.mesh.scale, mesh_filename)
         return None
