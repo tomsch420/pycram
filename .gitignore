@@ -72,3 +72,4 @@ resources/cached/
 # Example checkpoints
 examples/.ipynb_checkpoints/
 */tmp/*
+resources/ikea
