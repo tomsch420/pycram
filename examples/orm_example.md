@@ -122,9 +122,11 @@ print(*actions, sep="\n")
 Of course all relational algebra operators, such as filtering and joining also work in pycram.orm queries. Let's say we need all the poses of objects, that were picked up by a robot. Since we defined a relationship between the PickUpAction table and the Object table and between the Object table and the Pose table in the ORM class schema, we can just use the join operator without any further specification:
 
 ```python
-object_actions = (session.scalars(select(pycram.orm.base.Pose)
-                  .join(pycram.orm.action_designator.PickUpAction.object)
-                  .join(pycram.orm.object_designator.Object.pose))
+import pycram.mediator_world.pose
+
+object_actions = (session.scalars(select(pycram.mediator_world.pose.Pose)
+                                  .join(pycram.orm.action_designator.PickUpAction.object)
+                                  .join(pycram.orm.object_designator.Object.pose))
                   .all())
 print(*object_actions, sep="\n")
 

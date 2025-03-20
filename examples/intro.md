@@ -405,11 +405,14 @@ print(*navigations, sep="\n")
 ```
 
 ```python
+import pycram.mediator_world.pose
+
 navigations = (session.scalars(
-    select(pycram.orm.action_designator.NavigateAction, pycram.orm.base.Position, pycram.orm.base.Quaternion).
+    select(pycram.orm.action_designator.NavigateAction, pycram.orm.base.Position,
+           pycram.mediator_world.pose.Quaternion).
     join(pycram.orm.action_designator.NavigateAction.pose).
-    join(pycram.orm.base.Pose.position).
-    join(pycram.orm.base.Pose.orientation)).all())
+    join(pycram.mediator_world.pose.Pose.position).
+    join(pycram.mediator_world.pose.Pose.orientation)).all())
 print(*navigations, sep="\n")
 ```
 

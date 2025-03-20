@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from enum import Flag, auto
 from typing import List
 
 from typing_extensions import Set, Optional
 
 from ..datastructures.enums import JointType
-from .geometry import Shape, Pose
+from .geometry import Shape
+from .pose import Vector3, Pose, PoseStamped
 
 
 @dataclass
@@ -24,7 +26,7 @@ class Link(WorldEntity):
     """
     name: str
 
-    pose: Pose
+    pose: Optional[PoseStamped]
     """
     The pose of the link in the world.
     """
@@ -44,6 +46,32 @@ class Link(WorldEntity):
     def __hash__(self):
         return hash(self.name)
 
+    @property
+    def child_links(self):
+        """
+        Returns all links that are child links of this link.
+        """
+        return {joint.child for joint in self._world.joints if joint.parent == self}
+
+    @property
+    def recursive_child_links(self):
+        """
+        Returns all links that are child links of this link, recursively.
+        """
+        child_links = self.child_links
+        for child_link in child_links:
+            child_links |= child_link.recursive_child_links
+        return child_links
+
+
+class AxisIdentifier(Flag):
+    """
+    Flag for axis identifiers used in Joints.
+    """
+    X = auto()
+    Y = auto()
+    Z = auto()
+
 
 @dataclass
 class Joint(WorldEntity):
@@ -51,8 +79,45 @@ class Joint(WorldEntity):
     Represents a joint in the world.
     """
     type: JointType
+    """
+    The type of the joint.
+    """
+
     parent: Link
+    """
+    The parent link of the joint.
+    """
+
     child: Link
+    """
+    The child link of the joint.
+    """
+
+    axis: AxisIdentifier
+    """
+    The axis (perhaps multiple) of the joint.
+    """
+    value: float = 0.
+
+    lower_limit: Optional[float] = None
+    """
+    The lower limit of the joint.
+    """
+
+    upper_limit: Optional[float] = None
+    """
+    The upper limit of the joint.
+    """
+
+    damping: float = 0.
+    """
+    The damping of the joint.
+    """
+
+    friction: float = 0.
+    """
+    The friction of the joint.
+    """
 
     def __hash__(self):
         return hash((self.parent, self.child))
@@ -94,3 +159,14 @@ class World:
         self.add_link(joint.child)
         joint._world = self
         self.joints.add(joint)
+
+    def add_from_world(self, world: World):
+        """
+        Adds all links and joints from another world to this world.
+
+        :param world: The world to add from.
+        """
+        for link in world.links:
+            self.add_link(link)
+        for joint in world.joints:
+            self.add_joint(joint)
