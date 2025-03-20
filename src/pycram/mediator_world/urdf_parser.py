@@ -1,12 +1,21 @@
-from typing_extensions import Optional, List
+from typing_extensions import Optional, List, Union
 
 from .geometry import Shape, Box
 from .pose import Vector3, Quaternion, Pose, Header, PoseStamped
-from .mediator_world import World, Link, Joint
+from .mediator_world import World, Link, Joint, JointAxis
 from urdf_parser_py import urdf
 
 from ..datastructures.dataclasses import Color
+from ..datastructures.enums import JointType, AxisIdentifier
 from ..utils import suppress_stdout_stderr
+
+joint_type_map = {'unknown': JointType.UNKNOWN,
+                 'revolute': JointType.REVOLUTE,
+                 'continuous': JointType.CONTINUOUS,
+                 'prismatic': JointType.PRISMATIC,
+                 'floating': JointType.FLOATING,
+                 'planar': JointType.PLANAR,
+                 'fixed': JointType.FIXED}
 
 class URDFParser:
     """
@@ -27,9 +36,39 @@ class URDFParser:
                 parsed = urdf.URDF.from_xml_string(file.read())
 
         links = [self.parse_link(link) for link in parsed.links]
-        print(*links, sep="\n")
+        [world.add_link(link) for link in links]
+
+        for joint in parsed.joints:
+            parent = world.get_link_by_name(joint.parent)
+            child = world.get_link_by_name(joint.child)
+            parsed_joint = self.parse_joint(joint, parent, child)
+            world.add_joint(parsed_joint)
 
         return world
+
+    def parse_joint(self, joint: urdf.Joint, parent: Link, child: Link) -> Joint:
+        axis = self.parse_joint_axis(joint.axis)
+
+        lower = None
+        upper = None
+        if joint.limit:
+            lower = joint.limit.lower
+            upper = joint.limit.upper
+
+        result = Joint(type=joint_type_map[joint.type], parent=parent, child=child,
+                       axis=axis, lower_limit=lower, upper_limit=upper)
+        return result
+
+    def parse_joint_axis(self, axis) -> JointAxis:
+        result = JointAxis(0)
+        if axis:
+            if axis.x:
+                result |= JointAxis.X
+            if axis.y:
+                result |= JointAxis.Y
+            if axis.z:
+                result |= JointAxis.Z
+        return result
 
     def visual_of_link(self, link: urdf.Link) -> List[Shape]:
         if link.visuals:
@@ -38,8 +77,10 @@ class URDFParser:
             return []
 
     def collision_of_link(self, link: urdf.Link) -> List[Shape]:
-        ...
-
+        if link.collisions:
+            return [self.parse_shape(collision, link) for collision in link.collisions]
+        else:
+            return []
 
     def parse_shape(self, shape: urdf.Visual, link: urdf.Link) -> Shape:
         geometry: urdf.GeometricType = shape.geometry
@@ -49,10 +90,10 @@ class URDFParser:
 
         raise NotImplementedError(f"Parsing of {geometry} not implemented yet.")
 
-    def parse_box(self, box: urdf.Box, shape: urdf.Visual, link: urdf.Link) -> Box:
+    def parse_box(self, box: urdf.Box, shape: Union[urdf.Visual, urdf.Collision], link: urdf.Link) -> Box:
         pose = self.as_pose_stamped(self.urdf_pose_to_pose(shape.origin), link)
 
-        if shape.material and shape.material.color.rgba:
+        if isinstance(shape, urdf.Visual) and shape.material and shape.material.color.rgba:
             color = Color(shape.material.color.rgba)
         else:
             color = Color()
@@ -67,7 +108,7 @@ class URDFParser:
         :return: The parsed link object.
         """
         return Link(link.name, pose=self.as_pose_stamped(self.urdf_pose_to_pose(link.origin), link),
-                    visual=self.visual_of_link(link))
+                    visual=self.visual_of_link(link), collision=self.collision_of_link(link))
 
     def urdf_pose_to_pose(self, pose: urdf.Pose) -> Pose:
         if pose:

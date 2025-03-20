@@ -64,7 +64,7 @@ class Link(WorldEntity):
         return child_links
 
 
-class AxisIdentifier(Flag):
+class JointAxis(Flag):
     """
     Flag for axis identifiers used in Joints.
     """
@@ -93,7 +93,7 @@ class Joint(WorldEntity):
     The child link of the joint.
     """
 
-    axis: AxisIdentifier
+    axis: JointAxis
     """
     The axis (perhaps multiple) of the joint.
     """
@@ -170,3 +170,15 @@ class World:
             self.add_link(link)
         for joint in world.joints:
             self.add_joint(joint)
+
+    def get_link_by_name(self, name: str) -> Optional[Link]:
+        """
+        Returns the link with the given name.
+
+        :param name: The name of the link.
+        :return: The link with the given name or None if not found.
+        """
+        for link in self.links:
+            if link.name == name:
+                return link
+        return None

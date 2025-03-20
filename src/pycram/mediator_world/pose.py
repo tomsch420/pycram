@@ -35,7 +35,7 @@ class Quaternion:
 
     def normalize(self):
         """
-        Normalize the quaternion.
+        Normalize the quaternion in-place.
         """
         norm = (self.x ** 2 + self.y ** 2 + self.z ** 2 + self.w ** 2) ** 0.5
         self.x /= norm

@@ -1,7 +1,7 @@
 from .. import tf_transformations
 from typing_extensions import List, Union, Tuple, Dict
 
-from ..ros import get_node_names
+from ..ros import get_node_names, logwarn
 from ..ros import  Duration, ServiceException
 from ..ros import  loginfo_once, logerr
 from ..ros import  get_service_proxy, wait_for_service
@@ -18,7 +18,11 @@ from ..datastructures.pose import Pose
 from ..robot_description import RobotDescription
 from ..failures import IKError
 from ..external_interfaces.giskard import projection_cartesian_goal, allow_gripper_collision
-from .pinocchio_ik import compute_ik
+
+try:
+    from .pinocchio_ik import compute_ik
+except ImportError:
+    logwarn("Could not import pinocchio_ik, please make sure that the pinocchio_ik package is installed.")
 
 
 def _make_request_msg(root_link: str, tip_link: str, target_pose: Pose, robot_object: Object,
