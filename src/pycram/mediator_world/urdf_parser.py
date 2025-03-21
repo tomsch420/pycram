@@ -1,6 +1,6 @@
 from typing_extensions import Optional, List, Union
 
-from .geometry import Shape, Box
+from .geometry import Shape, Box, Mesh, Cylinder
 from .pose import Vector3, Quaternion, Pose, Header, PoseStamped
 from .mediator_world import World, Link, Joint, JointAxis
 from urdf_parser_py import urdf
@@ -62,11 +62,11 @@ class URDFParser:
     def parse_joint_axis(self, axis) -> JointAxis:
         result = JointAxis(0)
         if axis:
-            if axis.x:
+            if axis[0]:
                 result |= JointAxis.X
-            if axis.y:
+            elif axis[1]:
                 result |= JointAxis.Y
-            if axis.z:
+            else:
                 result |= JointAxis.Z
         return result
 
@@ -87,19 +87,37 @@ class URDFParser:
 
         if isinstance(geometry, urdf.Box):
             return self.parse_box(geometry, shape, link)
+        elif isinstance(geometry, urdf.Mesh):
+            return self.parse_mesh(geometry, shape, link)
+        elif isinstance(geometry, urdf.Cylinder):
+            return self.parse_cylinder(geometry, shape, link)
 
-        raise NotImplementedError(f"Parsing of {geometry} not implemented yet.")
+        raise NotImplementedError(f"Parsing of {type(geometry)}: {geometry} not implemented yet.")
+
+    def get_color(self, shape: Union[urdf.Visual, urdf.Collision]) -> Color:
+        if isinstance(shape, urdf.Visual) and shape.material and shape.material.color and shape.material.color.rgba:
+            return Color(shape.material.color.rgba)
+        else:
+            return Color()
 
     def parse_box(self, box: urdf.Box, shape: Union[urdf.Visual, urdf.Collision], link: urdf.Link) -> Box:
         pose = self.as_pose_stamped(self.urdf_pose_to_pose(shape.origin), link)
-
-        if isinstance(shape, urdf.Visual) and shape.material and shape.material.color.rgba:
-            color = Color(shape.material.color.rgba)
-        else:
-            color = Color()
+        color = self.get_color(shape)
 
         result = Box(length=box.size[0], width=box.size[1], height=box.size[2], pose=pose, color=color)
         return result
+
+    def parse_mesh(self, mesh: urdf.Mesh, shape: Union[urdf.Visual, urdf.Collision], link: urdf.Link) -> Mesh:
+
+        scale = Vector3(*mesh.scale) if mesh.scale else Vector3(1., 1., 1.)
+
+        return Mesh(filename=mesh.filename, scale=scale,
+                    pose=self.as_pose_stamped(self.urdf_pose_to_pose(shape.origin), link))
+
+    def parse_cylinder(self, cylinder: urdf.Cylinder, shape: Union[urdf.Visual, urdf.Collision], link: urdf.Link) -> Cylinder:
+        color = self.get_color(shape)
+        return Cylinder(radius=cylinder.radius, length=cylinder.length, pose=self.as_pose_stamped(self.urdf_pose_to_pose(shape.origin), link), color=color)
+
 
     def parse_link(self, link: urdf.Link) -> Link:
         """

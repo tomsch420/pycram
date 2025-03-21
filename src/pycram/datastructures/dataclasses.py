@@ -24,6 +24,7 @@ from .pose import Pose, Point, Transform
 from ..ros import logwarn, logwarn_once
 from ..utils import classproperty
 from ..validation.error_checkers import calculate_joint_position_error, is_error_acceptable
+from std_msgs.msg import ColorRGBA as ROSColor
 
 if TYPE_CHECKING:
     from ..description import Link
@@ -178,6 +179,9 @@ class Color:
         :return: The rgba_color as a list of RGB values
         """
         return [self.R, self.G, self.B]
+
+    def ros_message(self) -> ROSColor:
+        return ROSColor(self.R, self.G, self.B, self.A)
 
 
 class Colors(Color, Enum):
