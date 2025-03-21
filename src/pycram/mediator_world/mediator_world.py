@@ -63,6 +63,11 @@ class Link(WorldEntity):
             child_links |= child_link.recursive_child_links
         return child_links
 
+class LinkView(WorldEntity):
+    """
+    Represents a view on a set of links in the world.
+    """
+    ...
 
 class JointAxis(Flag):
     """
