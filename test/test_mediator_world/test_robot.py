@@ -10,3 +10,4 @@ class PR2TestCase(unittest.TestCase):
 
     def test_pr2_from_urdf(self):
         pr2 = PR2.make_from_urdf()
+        print(pr2)
