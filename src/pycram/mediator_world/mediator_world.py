@@ -70,12 +70,28 @@ class Link(WorldEntity):
             child_links |= child_link.recursive_child_links
         return child_links
 
+    @property
+    def parent_link(self):
+        """
+        Returns the parent link of this link.
+        """
+        for joint in self._world.joints:
+            if joint.child == self:
+                return joint.parent
+        return None
+
     @classmethod
     def from_link(cls, link: Link):
         """
         Creates a new link from an existing link.
         """
-        return cls(link.name, link.pose, link.visual, link.collision)
+        new_link = cls(link.name, link.pose, link.visual, link.collision)
+        new_link._world = link._world
+        return new_link
+
+    def __eq__(self, other):
+        return self.name == other.name and self._world is other._world
+
 
 class LinkView(WorldEntity):
     """

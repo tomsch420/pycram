@@ -14,127 +14,375 @@ from ..ros import get_ros_package_path
 
 @dataclass
 class RobotLink(Link):
+    """
+    Represents a link in a robot.
+    """
     _robot: Optional[AbstractRobot] = field(default=None, init=False)
 
 
 @dataclass
 class RobotLinkView(LinkView):
+    """
+    Represents a collection of connected robot links, starting from a root link, and ending in a unspecified collection
+    of tip links.
+    """
     _robot: AbstractRobot = field(default=None, init=False)
-    start_link: RobotLink
-    end_link: Optional[RobotLink] = None
+    root_link: RobotLink = field(default_factory=RobotLink)
+    identifier: str = field(default_factory=str)
+
+
+@dataclass
+class KinematicChain(RobotLinkView):
+    """
+    Represents a kinematic chain in a robot, starting from a root link, and ending in a specific tip link.
+    A kinematic chain can contain both manipulators and sensors at the same time, and is not limited to a single
+    instance of each.
+    """
+    tip_link: RobotLink = field(default_factory=RobotLink)
+    manipulator: Optional[Manipulator] = None
+    sensors: Optional[List[Sensor]] = None
+
 
 @dataclass
 class RobotBase(RobotLinkView):
-    torso: RobotLinkView = field(default_factory=RobotLinkView)
+    """
+    Represents the structural core of the robot. It may be connected directly to a collection of kinematic chains, one
+    of which may be a torso.
+    """
+    torso: KinematicChain = field(default_factory=KinematicChain)
     kinematic_chains: List[KinematicChain] = field(default_factory=list)
 
 class WheelBaseType(str, enum.Enum):
+    """
+    Example collection of wheel base types.
+    """
     OMNI = "omni"
     DIFFERENTIAL = "differential"
     ACKERMANN = "ackermann"
     MECANUM = "mecanum"
     TRACKS = "tracks"
 
+
 class Direction(int, enum.Enum):
-    FORWARD = 1
-    BACKWARD = -1
+    POSITIVE = 1
+    NEGATIVE = -1
+
 
 @dataclass
 class AxisDirection:
     axis: AxisIdentifier
     direction: Direction
 
+
 @dataclass
 class WheeledBase(RobotBase):
+    """
+    Represents a wheeled base of a robot.
+    """
     type: WheelBaseType = field(default_factory=str)
 
 
 @dataclass
-class Finger(RobotLinkView):
-    ...
+class Manipulator(RobotLinkView):
+    """
+    Represents a manipulator of a robot. Always has a tool frame.
+    """
+    tool_frame: RobotLink = field(default_factory=RobotLink)
 
 
 @dataclass
-class Manipulator(RobotLinkView):
+class Finger(KinematicChain):
+    """
+    A finger is a kinematic chain, since it should have an unambiguous tip link, and may contain sensors.
+    """
     ...
 
 
 @dataclass
 class Gripper(Manipulator):
+    """
+    Represents a gripper of a robot. Contains a collection of fingers and a thumb. The thumb is a specific finger
+    that always needs to touch an object when grasping it, ensuring a stable grasp.
+    """
     fingers: List[Finger] = field(default_factory=list)
     thumb: Optional[Finger] = None
 
+
 @dataclass
 class Sensor(RobotLink):
-    ...
+    """
+    Represents any kind of sensor in a robot.
+    """
+    identifier: str = field(default_factory=str)
+
 
 @dataclass
 class FieldOfView:
     vertical_angle: float
     horizontal_angle: float
 
+
 @dataclass
 class Camera(Sensor):
+    """
+    Represents a camera sensor in a robot.
+    """
     forward_facing_axis: AxisDirection = field(default_factory=AxisDirection)
     field_of_view: FieldOfView = field(default_factory=FieldOfView)
     minimal_height: float = 0.0
     maximal_height: float = 1.0
 
-@dataclass
-class KinematicChain(RobotLinkView):
-    manipulator: Optional[Manipulator] = None
-    sensors: Optional[List[Sensor]] = None
 
 @dataclass
-class Torso(RobotLinkView):
+class Neck(KinematicChain):
+    """
+    Represents a special kinematic chain to identify the different links of the neck, which is useful to calculate
+    for example "LookAt" joint states without needing IK
+    """
+    roll_link: Optional[RobotLink] = None
+    pitch_link: Optional[RobotLink] = None
+    yaw_link: Optional[RobotLink] = None
+
+
+@dataclass
+class Torso(KinematicChain):
+    """
+    A Torso is a kinematic chain connecting the base of the robot with a collection of other kinematic chains.
+    """
     kinematic_chains: List[KinematicChain] = field(default_factory=list)
+
 
 @dataclass
 class AbstractRobot(LinkView):
+    """
+    Specification of an abstract robot. A robot consists of:
+    - a base, which is the structural core of the robot
+    - an optional torso, which is a kinematic chain (usually without a manipulator) connecting the base with a collection
+        of other kinematic chains
+    - an optional collection of manipulator chains, each containing a manipulator, such as a gripper
+    - an optional collection of sensor chains, each containing a sensor, such as a camera
+    => If a kinematic chain contains both a manipulator and a sensor, it will be part of both collections
+    """
     base: RobotBase
+    torso: Optional[Torso] = None
     manipulator_chains: Optional[List[KinematicChain]] = None
     sensor_chains: Optional[List[KinematicChain]] = None
-    torso : Optional[Torso] = None
+
+    def __repr__(self):
+        manipulator_identifiers = [chain.identifier for chain in self.manipulator_chains] if self.manipulator_chains else []
+        sensor_identifiers = [chain.identifier for chain in self.sensor_chains] if self.sensor_chains else []
+        return f"<{self.__class__.__name__} base={self.base.identifier}, torso={self.torso.identifier}, manipulators={manipulator_identifiers}, sensors={sensor_identifiers}>"
+
+    def __str__(self):
+        def format_tree(node, prefix="", is_last=True):
+            label, children = node
+            branch = "└── " if is_last else "├── "
+            result = prefix + branch + label
+            if children:
+                new_prefix = prefix + ("    " if is_last else "│   ")
+                for idx, child in enumerate(children):
+                    result += "\n" + format_tree(child, new_prefix, idx == len(children) - 1)
+            return result
+
+        def make_base_node(base):
+            base_label = f"{base.identifier} ({base.__class__.__name__}): Type={getattr(base, 'type', 'Unknown')}"
+            return base_label, []
+
+        def make_chain_node(chain: KinematicChain):
+            children = []
+            if chain.manipulator:
+                manip_label = f"{chain.manipulator.identifier} ({chain.manipulator.__class__.__name__}):"
+                manip_children = [(f"Tool Frame: {chain.manipulator.tool_frame.name}", [])]
+                if isinstance(chain.manipulator, Gripper):
+                    if chain.manipulator.fingers:
+                        finger_children = []
+                        for idx, finger in enumerate(chain.manipulator.fingers):
+                            finger_children.append((
+                                f"[{idx}] {finger.identifier} ({finger.__class__.__name__}): {finger.root_link.name} → {finger.tip_link.name}", []
+                            ))
+                        if chain.manipulator.thumb:
+                            finger_children.append((
+                                f"{chain.manipulator.thumb.identifier} ({chain.manipulator.thumb.__class__.__name__}): {chain.manipulator.thumb.root_link.name} → {chain.manipulator.thumb.tip_link.name}",
+                                []
+                            ))
+                        manip_children.append(("Fingers:", finger_children))
+                children.append((manip_label, manip_children))
+            if chain.sensors:
+                sensor_children = []
+                for sensor in chain.sensors:
+                    if isinstance(sensor, Camera):
+                        sensor_children.append((
+                            f"{sensor.identifier} ({sensor.__class__.__name__}): [Camera, Axis={sensor.forward_facing_axis.axis.name}, Direction={sensor.forward_facing_axis.direction.name}, "
+                            f"FOV=({sensor.field_of_view.horizontal_angle:.2f}, {sensor.field_of_view.vertical_angle:.2f})]",
+                            []
+                        ))
+                    else:
+                        sensor_children.append((sensor.identifier, []))
+                children.append(("Sensors:", sensor_children))
+            if hasattr(chain, "roll_link") and chain.roll_link:
+                children.append((f"Roll Link: {chain.roll_link.name}", []))
+            if hasattr(chain, "pitch_link") and chain.pitch_link:
+                children.append((f"Pitch Link: {chain.pitch_link.name}", []))
+            if hasattr(chain, "yaw_link") and chain.yaw_link:
+                children.append((f"Yaw Link: {chain.yaw_link.name}", []))
+            return f"{chain.identifier} ({chain.__class__.__name__}): {chain.root_link.name} → {chain.tip_link.name}", children
+
+        def make_torso_node(torso: Torso):
+            torso_label = f"{torso.identifier} ({torso.__class__.__name__}): {torso.root_link.name} → {torso.tip_link.name}"
+            children = [make_chain_node(kc) for kc in torso.kinematic_chains]
+            return torso_label, children
+
+        def make_manipulator_chains_node(chains: List[KinematicChain]):
+            label = "Manipulator Chains:"
+            children = [make_chain_node(kc) for kc in chains]
+            return label, children
+
+        def make_sensor_chains_node(chains: List[KinematicChain]):
+            label = "Sensor Chains:"
+            children = [make_chain_node(kc) for kc in chains]
+            return label, children
+
+        root_children = [make_base_node(self.base)]
+        if self.torso:
+            root_children.append(make_torso_node(self.torso))
+        if self.manipulator_chains:
+            root_children.append(make_manipulator_chains_node(self.manipulator_chains))
+        if self.sensor_chains:
+            root_children.append(make_sensor_chains_node(self.sensor_chains))
+
+        tree = (f"<{self.__class__.__name__}>", root_children)
+        return format_tree(tree, prefix="", is_last=True)
 
 
-@dataclass
+@dataclass(repr=False)
 class PR2(AbstractRobot):
 
     @classmethod
     def make_from_urdf(cls, filename: Optional[str] = None) -> Self:
         if filename is None:
-            filename = "resources/robots/pr2.urdf"
-            filename = os.path.join(get_ros_package_path("pycram"), filename)
+            filename = os.path.join(get_ros_package_path("pycram"), "resources/robots/pr2.urdf")
 
         parser = URDFParser(filename)
         world = parser.parse()
-        torso_link = RobotLink.from_link(world.get_link_by_name("torso_lift_link"))
 
-        left_fingers_links = ["l_gripper_l_finger_link", "l_gripper_r_finger_link"]
-        left_fingers = [Finger(start_link=RobotLink.from_link(world.get_link_by_name(link))) for link in left_fingers_links]
-        left_thumb = Finger(start_link=RobotLink.from_link(world.get_link_by_name("l_gripper_l_finger_link")))
-        left_tool_frame = RobotLink.from_link(world.get_link_by_name("l_gripper_tool_frame"))
-        left_gripper = Gripper(start_link=RobotLink.from_link(world.get_link_by_name("l_gripper_palm_link")), fingers=left_fingers, thumb=left_thumb, end_link=left_tool_frame)
-        left_arm = KinematicChain(start_link=RobotLink.from_link(world.get_link_by_name("l_shoulder_pan_link")),
-                                  manipulator=left_gripper)
+        def create_fingers(world, finger_link_pairs, prefix):
+            """
+            Note: Current assumes the last finger in the list is the thumb, in reality not always the case
+            """
+            fingers = []
+            for index, (root_name, tip_name) in enumerate(finger_link_pairs):
+                root_link_obj = world.get_link_by_name(root_name)
+                tip_link_obj = world.get_link_by_name(tip_name)
+                if root_link_obj and tip_link_obj:
+                    finger = Finger(
+                        root_link=RobotLink.from_link(root_link_obj),
+                        tip_link=RobotLink.from_link(tip_link_obj),
+                        identifier=f"{prefix}_finger_{index}"
+                    )
+                    fingers.append(finger)
+            thumb = fingers[-1] if fingers else None
+            if thumb:
+                thumb.identifier = f"{prefix}_thumb"
+            return fingers, thumb
 
-        right_fingers_links = ["r_gripper_l_finger_link", "r_gripper_r_finger_link"]
-        right_fingers = [Finger(start_link=RobotLink.from_link(world.get_link_by_name(link))) for link in right_fingers_links]
-        right_thumb = Finger(start_link=RobotLink.from_link(world.get_link_by_name("r_gripper_l_finger_link")))
-        right_tool_frame = RobotLink.from_link(world.get_link_by_name("r_gripper_tool_frame"))
-        right_gripper = Gripper(start_link=RobotLink.from_link(world.get_link_by_name("r_gripper_palm_link")), fingers=right_fingers, thumb=right_thumb, end_link=right_tool_frame)
-        right_arm = KinematicChain(start_link=RobotLink.from_link(world.get_link_by_name("r_shoulder_pan_link")),
-                                   manipulator=right_gripper)
+        def create_gripper(world, palm_link_name, tool_frame_name, finger_links, prefix):
+            fingers, thumb = create_fingers(world, finger_links, prefix)
+            palm_link = world.get_link_by_name(palm_link_name)
+            tool_frame_link = world.get_link_by_name(tool_frame_name)
+            if palm_link and tool_frame_link and thumb:
+                return Gripper(
+                    identifier=f"{prefix}_gripper",
+                    root_link=RobotLink.from_link(palm_link),
+                    fingers=fingers,
+                    thumb=thumb,
+                    tool_frame=RobotLink.from_link(tool_frame_link)
+                )
+            return None
 
-        head = KinematicChain(start_link=RobotLink.from_link(world.get_link_by_name("head_pan_link")),
-                              end_link=RobotLink.from_link(world.get_link_by_name("head_tilt_link")),
-                              sensors=[Camera(RobotLink.from_link(world.get_link_by_name("head_camera_link")))])
+        def create_arm(world, shoulder_link_name, gripper, prefix):
+            shoulder_link = world.get_link_by_name(shoulder_link_name)
+            if shoulder_link and gripper:
+                arm_tip_link = gripper.root_link.parent_link
+                return KinematicChain(
+                    identifier=f"{prefix}_arm",
+                    root_link=RobotLink.from_link(shoulder_link),
+                    tip_link=RobotLink.from_link(arm_tip_link),
+                    manipulator=gripper
+                )
+            return None
 
-        torso = Torso(start_link=torso_link, end_link=torso_link, kinematic_chains=[left_arm, right_arm, head])
-        base = WheeledBase(start_link=RobotLink.from_link(world.get_link_by_name("base_link")),
-                           type=WheelBaseType.OMNI, torso=torso, kinematic_chains=[left_arm, right_arm, head])
+        ################################# Create robot #################################
+        ################################### Left Arm ###################################
+        left_finger_links = [
+            ("l_gripper_l_finger_link", "l_gripper_l_finger_tip_link"),
+            ("l_gripper_r_finger_link", "l_gripper_r_finger_tip_link"),
+        ]
+        left_gripper = create_gripper(world, "l_gripper_palm_link", "l_gripper_tool_frame",
+                                      left_finger_links, "left")
+        left_arm = create_arm(world, "l_shoulder_pan_link", left_gripper, "left")
 
-        cls.base = base
-        cls.torso = torso
-        cls.manipulator_chains = [left_arm, right_arm]
-        cls.sensor_chains = [head]
+        ################################### Right Arm ###################################
+        right_finger_links = [
+            ("r_gripper_l_finger_link", "r_gripper_l_finger_tip_link"),
+            ("r_gripper_r_finger_link", "r_gripper_r_finger_tip_link"),
+        ]
+        right_gripper = create_gripper(world, "r_gripper_palm_link", "r_gripper_tool_frame",
+                                       right_finger_links, "right")
+        right_arm = create_arm(world, "r_shoulder_pan_link", right_gripper, "right")
+
+        ################################# Create camera #################################
+        camera_link = world.get_link_by_name("wide_stereo_optical_frame")
+        camera = Camera(
+            camera_link.name,
+            camera_link.pose,
+            camera_link.visual,
+            camera_link.collision,
+            identifier="kinect_camera",
+            forward_facing_axis=AxisDirection(AxisIdentifier.Z, Direction.POSITIVE),
+            field_of_view=FieldOfView(horizontal_angle=0.99483, vertical_angle=0.75049),
+            minimal_height=1.27,
+            maximal_height=1.60
+        ) if camera_link else None
+
+        ################################## Create head ##################################
+        neck_root_link = world.get_link_by_name("head_pan_link")
+        neck_tip_link = world.get_link_by_name("head_tilt_link")
+        head = None
+        if neck_root_link and neck_tip_link and camera:
+            head = Neck(
+                identifier="neck",
+                root_link=RobotLink.from_link(neck_root_link),
+                tip_link=RobotLink.from_link(neck_tip_link),
+                sensors=[camera],
+                pitch_link=neck_tip_link,
+                yaw_link=neck_root_link
+            )
+
+        ################################## Create torso ##################################
+        torso_link = world.get_link_by_name("torso_lift_link")
+        torso_root = RobotLink.from_link(torso_link) if torso_link else None
+        torso = None
+        if torso_root and torso_link:
+            torso = Torso(
+                identifier="torso",
+                root_link=torso_root,
+                tip_link=torso_link,
+                kinematic_chains=[kc for kc in [left_arm, right_arm, head] if kc]
+            )
+
+        ################################## Create base ##################################
+        base_link = world.get_link_by_name("base_link")
+        base_root = RobotLink.from_link(base_link) if base_link else None
+        base = WheeledBase(
+            identifier="pr2_base",
+            root_link=base_root,
+            type=WheelBaseType.OMNI,
+            torso=torso,
+            kinematic_chains=[chain for chain in [left_arm, right_arm, head] if chain]
+        )
+
+        ################################## Create robot ##################################
+        manipulator_chains = [chain for chain in [left_arm, right_arm] if chain]
+        sensor_chains = [head] if head else []
+
+        return cls(base=base, torso=torso, manipulator_chains=manipulator_chains, sensor_chains=sensor_chains)
