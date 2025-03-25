@@ -302,18 +302,17 @@ class LocalTransformer(Buffer, WorldEntity):
         """
         return self.transform_pose(pose, link.name)
 
-    def update_transform_for_link(self, link: Link):
+    def update_transform_for_link(self, link: Link, time_of_update: Time):
         """
         Updates the transform for the given link frame_id.
 
         """
-
         if link == self._world.origin:
             return
 
         # convert to ros messages
         link_pose_ros = link.origin.ros_message()
-        link_pose_ros.header.stamp = Time().now()
+        link_pose_ros.header.stamp = time_of_update
 
         # assemble transformation
         link_transform = Transform(translation=link_pose_ros.pose.position,
@@ -334,13 +333,16 @@ class LocalTransformer(Buffer, WorldEntity):
         :return: A transformed pose in the target frame_id
         """
 
-        self.update_transform_for_link(self._world.get_link_by_name(pose.frame_id))
-        self.update_transform_for_link(self._world.get_link_by_name(target_frame))
+        now = Time().now()
+
+        self.update_transform_for_link(self._world.get_link_by_name(pose.frame_id), now)
+        self.update_transform_for_link(self._world.get_link_by_name(target_frame), now)
 
         copy_pose = pose.copy()
-        copy_pose.header.stamp = Time().now()
 
-        if not self.can_transform(target_frame, pose.frame_id, Time(0)):
+        copy_pose.header.stamp = now
+
+        if not self.can_transform(target_frame, pose.frame_id, now):
             raise tf2_ros.LookupException(f"Cannot transform from {pose.header.frame_id} to {target_frame}.")
 
         new_pose = self.transform(copy_pose, target_frame)
@@ -418,7 +420,8 @@ class World:
         link._world = self
         self.links.add(link)
 
-        self.transformer.update_transform_for_link(link)
+        self.transformer.update_transform_for_link(link, Time().now())
+
 
     def add_joint(self, joint: Joint):
         """
