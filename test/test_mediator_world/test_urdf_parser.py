@@ -14,7 +14,11 @@ class URDFTestCase(unittest.TestCase):
         world = parser.parse()
         self.assertEqual(len(world.joints), 5)
         self.assertTrue(all([joint.type == JointType.FIXED for joint in world.joints]))
-        self.assertEqual(len(world.links), 6)
+        self.assertEqual(len(world.links), 7)
+
+        left_front_leg = world.get_link_by_name("left_front_leg")
+        print("\n")
+        print(*world.links, sep="\n")
 
 if __name__ == '__main__':
     unittest.main()

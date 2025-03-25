@@ -26,16 +26,16 @@ class Shape(ABC):
     """
     Base class for all shapes in the world.
     """
-    pose: PoseStamped = field(default_factory=Pose)
+    origin: PoseStamped = field(default_factory=Pose)
 
     def ros_message(self) -> Marker:
         """
         Returns a visualization_msgs.msg.Marker representation of the shape.
         """
         marker = Marker()
-        marker.header = self.pose.header.ros_message()
+        marker.header = self.origin.header.ros_message()
         marker.action = Marker.ADD
-        marker.pose = self.pose.pose.ros_message()
+        marker.pose = self.origin.pose.ros_message()
         marker.scale = Vector3(1., 1., 1.).ros_message()
         marker.color = Color().ros_message()
         marker.lifetime = Duration(1)

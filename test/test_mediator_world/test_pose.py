@@ -6,7 +6,30 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import registry, Session
 
 import pycram.mediator_world.pose
+import copy
 
+
+class PoseTestCase(unittest.TestCase):
+
+    def test_copy(self):
+        pose = pycram.mediator_world.pose.Pose()
+        pose.position.x = 1
+        pose.position.y = 2
+        pose.position.z = 3
+        pose.orientation.x = 4
+        pose.orientation.y = 5
+        pose.orientation.z = 6
+        pose.orientation.w = 7
+
+        pose_copy = copy.copy(pose)
+
+        self.assertEqual(pose.position.x, pose_copy.position.x)
+        self.assertEqual(pose.position.y, pose_copy.position.y)
+        self.assertEqual(pose.position.z, pose_copy.position.z)
+        self.assertEqual(pose.orientation.x, pose_copy.orientation.x)
+        self.assertEqual(pose.orientation.y, pose_copy.orientation.y)
+        self.assertEqual(pose.orientation.z, pose_copy.orientation.z)
+        self.assertEqual(pose.orientation.w, pose_copy.orientation.w)
 
 class ORMaticIntegrationTestCase(unittest.TestCase):
 

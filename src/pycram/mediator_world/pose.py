@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import datetime
 from dataclasses import dataclass, field
 
@@ -70,20 +71,21 @@ class Pose:
         point = ROSPoint(x=self.position.x, y=self.position.y, z=self.position.z)
         return ROSPose(position=point, orientation=self.orientation.ros_message())
 
+    def copy(self):
+        return copy.copy(self)
 
 @dataclass
 class Header:
     """
     A header with a timestamp.
     """
-    frame: str = "map"
+    frame_id: str = "map"
     timestamp: datetime.datetime = field(default_factory=datetime.datetime.now)
     sequence: int = 0
 
     def ros_message(self) -> ROSHeader:
         stamp = ROSTime.from_sec(self.timestamp.timestamp())
-        return ROSHeader(frame_id="map", stamp=stamp, seq=self.sequence)
-
+        return ROSHeader(frame_id=self.frame_id, stamp=stamp, seq=self.sequence)
 
 @dataclass
 class PoseStamped:
@@ -102,14 +104,16 @@ class PoseStamped:
         return self.pose.orientation
 
     @property
-    def frame(self):
-        return self.header.frame
+    def frame_id(self):
+        return self.header.frame_id
 
     def __repr__(self):
         return (f"Pose: {[round(v, 3) for v in [self.position.x, self.position.y, self.position.z]]}, "
                 f"{[round(v, 3) for v in [self.orientation.x, self.orientation.y, self.orientation.z, self.orientation.w]]} "
-                f"in frame {self.frame}")
+                f"in frame_id {self.frame_id}")
 
     def ros_message(self) -> ROSPoseStamped:
         return ROSPoseStamped(pose=self.pose.ros_message(), header=self.header.ros_message())
 
+    def copy(self):
+        return copy.copy(self)

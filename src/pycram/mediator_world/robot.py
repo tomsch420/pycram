@@ -85,7 +85,7 @@ class WheeledBase(RobotBase):
 @dataclass
 class Manipulator(RobotLinkView):
     """
-    Represents a manipulator of a robot. Always has a tool frame.
+    Represents a manipulator of a robot. Always has a tool frame_id.
     """
     tool_frame: RobotLink = field(default_factory=RobotLink)
 

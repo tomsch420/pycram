@@ -36,14 +36,15 @@ class URDFParser:
                 parsed = urdf.URDF.from_xml_string(file.read())
 
         links = [self.parse_link(link) for link in parsed.links]
-        [world.add_link(link) for link in links]
-
+        joints = []
         for joint in parsed.joints:
-            parent = world.get_link_by_name(joint.parent)
-            child = world.get_link_by_name(joint.child)
+            parent = [link for link in links if link.name == joint.parent][0]
+            child = [link for link in links if link.name == joint.child][0]
             parsed_joint = self.parse_joint(joint, parent, child)
-            world.add_joint(parsed_joint)
+            joints.append(parsed_joint)
 
+        [world.add_link(link) for link in links]
+        [world.add_joint(joint) for joint in joints]
         return world
 
     def parse_joint(self, joint: urdf.Joint, parent: Link, child: Link) -> Joint:
@@ -55,8 +56,13 @@ class URDFParser:
             lower = joint.limit.lower
             upper = joint.limit.upper
 
+        origin = self.urdf_pose_to_pose(joint.origin)
+        origin = PoseStamped(origin, Header(frame_id=parent.name))
+
         result = Joint(type=joint_type_map[joint.type], parent=parent, child=child,
-                       axis=axis, lower_limit=lower, upper_limit=upper)
+                       axis=axis, lower_limit=lower, upper_limit=upper, origin=origin)
+
+        child.origin = origin
         return result
 
     def parse_joint_axis(self, axis) -> JointAxis:
@@ -104,7 +110,7 @@ class URDFParser:
         pose = self.as_pose_stamped(self.urdf_pose_to_pose(shape.origin), link)
         color = self.get_color(shape)
 
-        result = Box(length=box.size[0], width=box.size[1], height=box.size[2], pose=pose, color=color)
+        result = Box(length=box.size[0], width=box.size[1], height=box.size[2], origin=pose, color=color)
         return result
 
     def parse_mesh(self, mesh: urdf.Mesh, shape: Union[urdf.Visual, urdf.Collision], link: urdf.Link) -> Mesh:
@@ -112,11 +118,11 @@ class URDFParser:
         scale = Vector3(*mesh.scale) if mesh.scale else Vector3(1., 1., 1.)
 
         return Mesh(filename=mesh.filename, scale=scale,
-                    pose=self.as_pose_stamped(self.urdf_pose_to_pose(shape.origin), link))
+                    origin=self.as_pose_stamped(self.urdf_pose_to_pose(shape.origin), link))
 
     def parse_cylinder(self, cylinder: urdf.Cylinder, shape: Union[urdf.Visual, urdf.Collision], link: urdf.Link) -> Cylinder:
         color = self.get_color(shape)
-        return Cylinder(radius=cylinder.radius, length=cylinder.length, pose=self.as_pose_stamped(self.urdf_pose_to_pose(shape.origin), link), color=color)
+        return Cylinder(radius=cylinder.radius, length=cylinder.length, origin=self.as_pose_stamped(self.urdf_pose_to_pose(shape.origin), link), color=color)
 
 
     def parse_link(self, link: urdf.Link) -> Link:
@@ -125,8 +131,7 @@ class URDFParser:
         :param link: The URDF link to parse.
         :return: The parsed link object.
         """
-        return Link(link.name, pose=self.as_pose_stamped(self.urdf_pose_to_pose(link.origin), link),
-                    visual=self.visual_of_link(link), collision=self.collision_of_link(link))
+        return Link(link.name, visual=self.visual_of_link(link), collision=self.collision_of_link(link))
 
     def urdf_pose_to_pose(self, pose: urdf.Pose) -> Pose:
         if pose:
@@ -135,4 +140,4 @@ class URDFParser:
             return Pose()
 
     def as_pose_stamped(self, pose: Pose, link: Link):
-        return PoseStamped(pose=pose, header=Header(frame=link.name))
+        return PoseStamped(pose=pose, header=Header(frame_id=link.name))
