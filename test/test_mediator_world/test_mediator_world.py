@@ -2,8 +2,9 @@ import os
 import time
 import unittest
 from pycram.mediator_world.mediator_world import *
-from pycram.mediator_world.pose import Header, Vector3, Quaternion
+from pycram.mediator_world.pose import Header, Vector3, Quaternion, Pose
 from pycram.mediator_world.urdf_parser import URDFParser
+from pycram.mediator_world.world_publisher import WorldPublisher
 from pycram.ros import get_ros_package_path
 
 
@@ -29,8 +30,6 @@ class TransformTestCase(unittest.TestCase):
         self.assertEqual(result.header.frame_id, "l1")
         self.assertEqual(result.position, correct_position)
         self.assertEqual(result.orientation, correct_orientation)
-
-
 
 class RVIZIntegrationTestCase(unittest.TestCase):
 
