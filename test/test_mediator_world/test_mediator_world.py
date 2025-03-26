@@ -22,7 +22,7 @@ class TransformTestCase(unittest.TestCase):
         w.add_link(l1)
         w.add_link(l2)
 
-        result = w._transformer.transform_pose(l2.origin, "l1")
+        result = w._transformer.transform_pose(l2.origin, l2, l1)
 
         correct_position = Vector3(2, 4, 6)
         correct_orientation = Quaternion(0, 0, -1, 1)

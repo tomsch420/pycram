@@ -20,6 +20,7 @@ from .geometry import Shape
 from .pose import Pose, PoseStamped, Header
 from ..datastructures.enums import JointType
 from ..ros import create_publisher, Duration, Time
+from .transformer import LocalTransformer
 
 
 @dataclass
@@ -189,7 +190,7 @@ class World:
     Set of joints in the world.
     """
 
-    _transformer: LocalTransformer = LocalTransformer()
+    _transformer: LocalTransformer = field(init=False)
     """
     The local transformer for the world.
     """
@@ -200,12 +201,13 @@ class World:
     """
 
     def __post_init__(self):
-        self._transformer._world = self
+        self._transformer = LocalTransformer(self.origin.name)
+
         self.add_link(self.origin)
 
         [self.add_link(link) for link in self.links]
         [self.add_joint(joint) for joint in self.joints]
-        # self.transform_all_links_to_frame(self.origin.name)
+        self.transform_everything_to_frame(self.origin)
 
     def add_link(self, link: Link):
         """
@@ -215,8 +217,7 @@ class World:
         """
         link._world = self
         self.links.add(link)
-        self._transformer.update_transform_for_link(link, Time(0))
-        self.transform_everything_to_frame(self.origin.name)
+        self.transform_everything_to_frame(self.origin)
 
     def add_joint(self, joint: Joint):
         """
@@ -224,10 +225,10 @@ class World:
 
         :param joint: The joint to add.
         """
-        self.add_link(joint.parent)
-        self.add_link(joint.child)
         joint._world = self
         self.joints.add(joint)
+        self.add_link(joint.parent)
+        self.add_link(joint.child)
 
     def add_from_world(self, world: World):
         """
@@ -252,20 +253,20 @@ class World:
                 return link
         return None
 
-    def transform_everything_to_frame(self, frame: str):
+    def transform_everything_to_frame(self, frame: Link):
         """
         Transforms all poses that are contained in the world to the given frame.
 
         :param frame: The frame to transform to.
         """
         for link in self.links:
-            link.origin = self._transformer.transform_pose(link.origin, frame)
+            link.origin = self._transformer.transform_pose(link.origin, link, self.origin)
             for shape in link.visual:
-                shape.origin = self._transformer.transform_pose(shape.origin, frame)
+                shape.origin = self._transformer.transform_pose(shape.origin, link, self.origin)
             for shape in link.collision:
-                shape.origin = self._transformer.transform_pose(shape.origin, frame)
+                shape.origin = self._transformer.transform_pose(shape.origin, link, self.origin)
         for joint in self.joints:
-            joint.origin = self._transformer.transform_pose(joint.origin, frame)
+            joint.origin = self._transformer.transform_pose(joint.origin, joint.parent, self.origin)
 
 class WorldPublisher:
     """

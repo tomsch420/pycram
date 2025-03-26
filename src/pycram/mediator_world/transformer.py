@@ -1,12 +1,17 @@
+import typing
+
 import numpy as np
-from geometry_msgs.msg import TransformStamped
+import tf2_ros
+from geometry_msgs.msg import TransformStamped, Transform
 from tf2_ros import Buffer
 from transforms3d.quaternions import quat2mat, mat2quat
-from typing_extensions import Optional, Iterable, Tuple
+from typing_extensions import Optional, Iterable, Tuple, List, TYPE_CHECKING
 
-from .mediator_world import WorldEntity
 from .pose import Pose, PoseStamped, Header
-from ..ros import Duration
+from ..ros import Duration, Time
+
+if TYPE_CHECKING:
+    from .mediator_world import Link
 
 
 def _build_affine(
@@ -112,7 +117,7 @@ def do_transform_pose_stamped(
     res.header = Header(transform.header.frame_id, pose.header.timestamp)
     return res
 
-class LocalTransformer(Buffer, WorldEntity):
+class LocalTransformer(Buffer):
     """
     This class allows to use the TF class TransformerROS without using the ROS
     network system or the topic /tf, where transforms are usually published to.
@@ -127,53 +132,52 @@ class LocalTransformer(Buffer, WorldEntity):
     `TFDoc <http://wiki.ros.org/tf/TfUsingPython>`_
     """
 
-    def __init__(self):
+    world_name: str
+    """
+    The name of the world.
+    """
+
+    def __init__(self, world_name: str):
         super().__init__(cache_time=Duration(10))
-        # Since this file can't import world.py this holds the reference to the current_world
-        self._world = None
+        self.world_name = world_name
         self.registration.add(PoseStamped, do_transform_pose_stamped)
 
-    def transform_pose_to_link_frame(self, pose: PoseStamped, link: Link) -> PoseStamped:
-        """
-        Transforms the given pose to the coordinate frame_id of the given link.
-        """
-        return self.transform_pose(pose, link.name)
-
-    def update_transform_for_link(self, link: Link, time_of_update: Time):
+    def update_transform_for_link(self, link_origin: PoseStamped, link_name: str, time_of_update: Time):
         """
         Updates the transform for the given link frame_id.
 
         """
-        if link == self._world.origin:
-            return
-
         # convert to ros messages
-        link_pose_ros = link.origin.ros_message()
+        link_pose_ros = link_origin.ros_message()
         link_pose_ros.header.stamp = time_of_update
 
         # assemble transformation
         link_transform = Transform(translation=link_pose_ros.pose.position,
                                    rotation=link_pose_ros.pose.orientation)
-        link_transform = TransformStamped(header=link_pose_ros.header, child_frame_id=link.name,
+        link_transform = TransformStamped(header=link_pose_ros.header, child_frame_id=link_name,
                                             transform=link_transform)
 
         # update local transformer
-        self.set_transform(link_transform, self._world.origin.origin.frame_id + "/local_transformer")
+        self.set_transform(link_transform, self.world_name + "/local_transformer")
 
-
-    def transform_pose(self, pose: PoseStamped, target_frame: str) -> Optional[PoseStamped]:
+    def transform_pose(self, pose: PoseStamped, pose_link: 'Link', target_link: 'Link') -> PoseStamped:
         """
-        Transforms a given pose to the target frame_id after updating the transforms for all objects in the current world.
+        Transforms a given pose to a pose in the target link frame.
 
-        :param pose: Pose that should be transformed
-        :param target_frame: Name of the TF frame_id into which the Pose should be transformed
-        :return: A transformed pose in the target frame_id
+        :param pose: The pose to transform
+        :param pose_link: The reference link of the pose (given in the pose.header.frame_id)
+        :param target_link: The target link frame
+
+        :return: The transformed pose
         """
+
+        if pose.frame_id == target_link.name:
+            return pose
 
         now = Time(0)
-
-        self.update_transform_for_link(self._world.get_link_by_name(pose.frame_id), now)
-        self.update_transform_for_link(self._world.get_link_by_name(target_frame), now)
+        target_frame = target_link.name
+        self.update_transform_for_link(pose_link.origin, pose_link.name, now)
+        self.update_transform_for_link(target_link.origin, target_link.name, now)
 
         copy_pose = pose.copy()
 
@@ -185,23 +189,23 @@ class LocalTransformer(Buffer, WorldEntity):
         new_pose = self.transform(copy_pose, target_frame)
         return new_pose
 
-    def lookup_transform_from_source_to_target_frame(self, source_frame: str, target_frame: str,
-                                                     time: Optional[Time] = None) -> Transform:
-        """
-        Update the transforms for all world objects then Look up for the latest known transform that transforms a point
-         from source frame_id to target frame_id. If no time is given the last common time between the two frames is used.
-
-        :param source_frame: The frame_id in which the point is currently represented
-        :param target_frame: The frame_id in which the point should be represented
-        :param time: Time at which the transform should be looked up
-        :return: The transform from source_frame to target_frame
-        """
-        objects = list(map(self.get_object_from_frame, [source_frame, target_frame]))
-        self.update_transforms_for_objects([obj for obj in objects if obj is not None])
-
-        tf_time = time if time else self.get_latest_common_time(source_frame, target_frame)
-        translation, rotation = self.lookup_transform(source_frame, target_frame, tf_time)
-        return Transform(translation, rotation, source_frame, target_frame)
+    # def lookup_transform_from_source_to_target_frame(self, source_frame: str, target_frame: str,
+    #                                                  time: Optional[Time] = None) -> Transform:
+    #     """
+    #     Update the transforms for all world objects then Look up for the latest known transform that transforms a point
+    #      from source frame_id to target frame_id. If no time is given the last common time between the two frames is used.
+    #
+    #     :param source_frame: The frame_id in which the point is currently represented
+    #     :param target_frame: The frame_id in which the point should be represented
+    #     :param time: Time at which the transform should be looked up
+    #     :return: The transform from source_frame to target_frame
+    #     """
+    #     objects = list(map(self.get_object_from_frame, [source_frame, target_frame]))
+    #     self.update_transforms_for_objects([obj for obj in objects if obj is not None])
+    #
+    #     tf_time = time if time else self.get_latest_common_time(source_frame, target_frame)
+    #     translation, rotation = self.lookup_transform(source_frame, target_frame, tf_time)
+    #     return Transform(translation, rotation, source_frame, target_frame)
 
     def get_all_frames(self) -> List[str]:
         """
