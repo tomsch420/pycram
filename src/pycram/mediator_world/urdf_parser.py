@@ -43,8 +43,9 @@ class URDFParser:
             parsed_joint = self.parse_joint(joint, parent, child)
             joints.append(parsed_joint)
 
-        [world.add_link(link) for link in links]
         [world.add_joint(joint) for joint in joints]
+        [world.add_link(link) for link in links]
+
         return world
 
     def parse_joint(self, joint: urdf.Joint, parent: Link, child: Link) -> Joint:

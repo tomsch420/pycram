@@ -13,16 +13,16 @@ class TransformTestCase(unittest.TestCase):
         w = World()
         p1 = Pose(Vector3(1, 2, 3), Quaternion(0, 0, 0, 1))
         p1 = PoseStamped(pose=p1, header=Header())
-        l1 = Link("l1", pose=p1)
+        l1 = Link("l1", origin=p1)
 
         p2 = Pose(Vector3(3, 6, 9), Quaternion(0, 0, -1, 1))
         p2 = PoseStamped(pose=p2, header=Header())
-        l2 = Link("l2", pose=p2)
+        l2 = Link("l2", origin=p2)
 
         w.add_link(l1)
         w.add_link(l2)
 
-        result = w.transformer.transform_pose(l2.pose, "l1")
+        result = w._transformer.transform_pose(l2.origin, "l1")
 
         correct_position = Vector3(2, 4, 6)
         correct_orientation = Quaternion(0, 0, -1, 1)
@@ -35,14 +35,12 @@ class TransformTestCase(unittest.TestCase):
 class RVIZIntegrationTestCase(unittest.TestCase):
 
     def test_rviz(self):
-        file = "resources/robots/pr2.urdf"
+        file = "resources/objects/table.urdf"
         file = os.path.join(get_ros_package_path("pycram"), file)
         parser = URDFParser(file)
         world = parser.parse()
-
         world_publisher = WorldPublisher(world)
         time.sleep(100)
-        exit(0)
 
 class ORMaticIntegrationTestCase(unittest.TestCase):
     ...

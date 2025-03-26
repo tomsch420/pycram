@@ -16,9 +16,8 @@ class URDFTestCase(unittest.TestCase):
         self.assertTrue(all([joint.type == JointType.FIXED for joint in world.joints]))
         self.assertEqual(len(world.links), 7)
 
-        left_front_leg = world.get_link_by_name("left_front_leg")
-        print("\n")
-        print(*world.links, sep="\n")
+        world.transform_all_links_to_frame(world.origin.name)
+        [self.assertTrue(l.origin.frame_id, world.origin.name) for l in world.links]
 
 if __name__ == '__main__':
     unittest.main()
