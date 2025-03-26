@@ -2,23 +2,17 @@ from __future__ import annotations
 
 from abc import ABC
 from dataclasses import dataclass, field
-from functools import lru_cache, cached_property
+from functools import cached_property
 
 import trimesh
 from visualization_msgs.msg import Marker
 
-from ..datastructures.dataclasses import Color
 from .pose import Vector3, Pose, PoseStamped
+from .utils import IDGenerator
+from ..datastructures.dataclasses import Color
 from ..ros import Duration
 
-class IDGenerator:
-    def __init__(self):
-        self._counter = 0
 
-    @lru_cache(maxsize=None)
-    def __call__(self, obj):
-        self._counter += 1
-        return self._counter
 id_generator = IDGenerator()
 
 
@@ -27,7 +21,7 @@ class Shape(ABC):
     """
     Base class for all shapes in the world.
     """
-    origin: PoseStamped = field(default_factory=Pose)
+    origin: PoseStamped = field(default_factory=PoseStamped)
 
     def ros_message(self) -> Marker:
         """
@@ -43,6 +37,7 @@ class Shape(ABC):
         marker.ns = "shapes"
         marker.id = id_generator(id(self))
         return marker
+
 
 @dataclass
 class Mesh(Shape):
@@ -88,6 +83,7 @@ class Primitive(Shape):
         marker.color = self.color.ros_message()
         return marker
 
+
 @dataclass
 class Sphere(Primitive):
     """
@@ -104,6 +100,7 @@ class Sphere(Primitive):
         marker.type = Marker.SPHERE
         marker.scale = Vector3(self.radius * 2, self.radius * 2, self.radius * 2).ros_message()
         return marker
+
 
 @dataclass
 class Capsule(Sphere):

@@ -26,6 +26,8 @@ class Vector3:
     def ros_message(self) -> ROSVector3:
         return ROSVector3(x=self.x, y=self.y, z=self.z)
 
+    def to_list(self):
+        return [self.x, self.y, self.z]
 
 @dataclass
 class Quaternion:
@@ -54,6 +56,8 @@ class Quaternion:
     def ros_message(self) -> ROSQuaternion:
         return ROSQuaternion(x=self.x, y=self.y, z=self.z, w=self.w)
 
+    def to_list(self):
+        return [self.x, self.y, self.z, self.w]
 
 @dataclass
 class Pose:

@@ -1,4 +1,4 @@
-import inspect
+import copy
 import unittest
 
 import ormatic.ormatic
@@ -6,7 +6,6 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import registry, Session
 
 import pycram.mediator_world.pose
-import copy
 
 
 class PoseTestCase(unittest.TestCase):
@@ -23,21 +22,16 @@ class PoseTestCase(unittest.TestCase):
 
         pose_copy = copy.copy(pose)
 
-        self.assertEqual(pose.position.x, pose_copy.position.x)
-        self.assertEqual(pose.position.y, pose_copy.position.y)
-        self.assertEqual(pose.position.z, pose_copy.position.z)
-        self.assertEqual(pose.orientation.x, pose_copy.orientation.x)
-        self.assertEqual(pose.orientation.y, pose_copy.orientation.y)
-        self.assertEqual(pose.orientation.z, pose_copy.orientation.z)
-        self.assertEqual(pose.orientation.w, pose_copy.orientation.w)
+        self.assertEqual(pose, pose_copy)
+
 
 class ORMaticIntegrationTestCase(unittest.TestCase):
 
     def test_integration(self):
-
         # list all classes of module
-        classes = inspect.getmembers(pycram.mediator_world.pose, inspect.isclass)
-        classes = [c[1] for c in classes]
+        classes = [pycram.mediator_world.pose.Vector3, pycram.mediator_world.pose.Quaternion,
+                   pycram.mediator_world.pose.Pose, pycram.mediator_world.pose.Header,
+                   pycram.mediator_world.pose.PoseStamped]
 
         # create ormatic tool
         mapper_registry = registry()
@@ -57,7 +51,6 @@ class ORMaticIntegrationTestCase(unittest.TestCase):
 
         # query the object
         query = session.scalars(select(pycram.mediator_world.pose.Pose)).all()
-
 
 
 if __name__ == '__main__':

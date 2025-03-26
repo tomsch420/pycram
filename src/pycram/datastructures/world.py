@@ -1451,7 +1451,7 @@ class World(WorldEntity, ABC):
         link_poses = [Pose() for _ in range(num_of_shapes)]
         link_masses = [1.0 for _ in range(num_of_shapes)]
         link_parent = [0 for _ in range(num_of_shapes)]
-        link_joints = [JointType.FIXED.value for _ in range(num_of_shapes)]
+        link_joints = [JointType.FIXED.value for _ in range("num_of_shapes")]
         link_collision = [-1 for _ in range(num_of_shapes)]
         link_joint_axis = [Point(x=1, y=0, z=0) for _ in range(num_of_shapes)]
 

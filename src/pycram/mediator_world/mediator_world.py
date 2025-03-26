@@ -55,11 +55,26 @@ class Link(WorldEntity):
         return hash(self.name)
 
     @property
+    def joints(self) -> List[Joint]:
+        """
+        Returns all joints that are connected to this link.
+        """
+        return [joint for joint in self._world.joints if joint.parent == self or joint.child == self]
+
+    @property
     def child_links(self):
         """
         Returns all links that are child links of this link.
         """
-        return {joint.child for joint in self._world.joints if joint.parent == self}
+        return [joint.child for joint in self._world.joints if joint.parent == self]
+
+
+    @property
+    def parent_links(self):
+        """
+        Returns all links that are parent links of this link.
+        """
+        return [joint.parent for joint in self._world.joints if joint.child == self]
 
     @property
     def recursive_child_links(self):
@@ -68,7 +83,7 @@ class Link(WorldEntity):
         """
         child_links = self.child_links
         for child_link in child_links:
-            child_links |= child_link.recursive_child_links
+            child_links += child_link.recursive_child_links
         return child_links
 
     @property
@@ -97,8 +112,9 @@ class Link(WorldEntity):
 class LinkView(WorldEntity):
     """
     Represents a view on a set of links in the world.
+
+    This class can hold references to certain links that gain meaning in this context.
     """
-    ...
 
 
 class JointAxis(int, enum.Enum):
@@ -109,6 +125,9 @@ class JointAxis(int, enum.Enum):
     X = 0
     Y = 1
     Z = 2
+
+    def to_list(self):
+        return [1 if i == self.value else 0 for i in range(3)]
 
 
 @dataclass
@@ -173,12 +192,12 @@ class World:
     This class implements a mediator pattern.
     """
 
-    links: Set[Link] = field(default_factory=set)
+    links: List[Link] = field(default_factory=list)
     """
     Set of links in the world.
     """
 
-    joints: Set[Joint] = field(default_factory=set)
+    joints: List[Joint] = field(default_factory=list)
     """
     Set of joints in the world.
     """
@@ -207,8 +226,12 @@ class World:
 
         :param link: The link to add.
         """
+
+        if link in self.links:
+            return
+
         link._world = self
-        self.links.add(link)
+        self.links.append(link)
         self.transform_everything_to_frame(self.origin)
 
     def add_joint(self, joint: Joint):
@@ -217,8 +240,12 @@ class World:
 
         :param joint: The joint to add.
         """
+
+        if joint in self.joints:
+            return
+
         joint._world = self
-        self.joints.add(joint)
+        self.joints.append(joint)
         self.add_link(joint.parent)
         self.add_link(joint.child)
 
@@ -243,6 +270,12 @@ class World:
         for link in self.links:
             if link.name == name:
                 return link
+        return None
+
+    def get_joint_between_links(self, parent: Link, child: Link) -> Optional[Joint]:
+        for joint in self.joints:
+            if joint.parent == parent and joint.child == child:
+                return joint
         return None
 
     def transform_everything_to_frame(self, frame: Link):
