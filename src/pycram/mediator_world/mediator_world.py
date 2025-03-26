@@ -5,22 +5,16 @@ import enum
 import threading
 import time
 from dataclasses import dataclass, field
-from functools import cached_property
 from typing import List
 
-import numpy as np
-import tf2_ros
-from geometry_msgs.msg import TransformStamped, Transform
-from tf2_ros import Buffer
-from transforms3d.quaternions import mat2quat, quat2mat
-from typing_extensions import Set, Optional, Tuple, Iterable
+from typing_extensions import Set, Optional
 from visualization_msgs.msg import MarkerArray
 
 from .geometry import Shape
-from .pose import Pose, PoseStamped, Header
-from ..datastructures.enums import JointType
-from ..ros import create_publisher, Duration, Time
+from .pose import PoseStamped
 from .transformer import LocalTransformer
+from ..datastructures.enums import JointType
+from ..ros import create_publisher
 
 
 @dataclass
@@ -100,6 +94,7 @@ class Link(WorldEntity):
 
     def __eq__(self, other):
         return self.name == other.name and self._world is other._world
+
 
 class LinkView(WorldEntity):
     """
@@ -204,7 +199,6 @@ class World:
         self._transformer = LocalTransformer(self.origin.name)
 
         self.add_link(self.origin)
-
         [self.add_link(link) for link in self.links]
         [self.add_joint(joint) for joint in self.joints]
         self.transform_everything_to_frame(self.origin)
@@ -260,13 +254,14 @@ class World:
         :param frame: The frame to transform to.
         """
         for link in self.links:
-            link.origin = self._transformer.transform_pose(link.origin, link, self.origin)
+            link.origin = self._transformer.transform_pose(link.origin, link, frame)
             for shape in link.visual:
-                shape.origin = self._transformer.transform_pose(shape.origin, link, self.origin)
+                shape.origin = self._transformer.transform_pose(shape.origin, link, frame)
             for shape in link.collision:
-                shape.origin = self._transformer.transform_pose(shape.origin, link, self.origin)
+                shape.origin = self._transformer.transform_pose(shape.origin, link, frame)
         for joint in self.joints:
-            joint.origin = self._transformer.transform_pose(joint.origin, joint.parent, self.origin)
+            joint.origin = self._transformer.transform_pose(joint.origin, joint.parent, frame)
+
 
 class WorldPublisher:
     """

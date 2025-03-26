@@ -35,7 +35,7 @@ class TransformTestCase(unittest.TestCase):
 class RVIZIntegrationTestCase(unittest.TestCase):
 
     def test_rviz(self):
-        file = "resources/objects/table.urdf"
+        file = "resources/robots/pr2.urdf"
         file = os.path.join(get_ros_package_path("pycram"), file)
         parser = URDFParser(file)
         world = parser.parse()

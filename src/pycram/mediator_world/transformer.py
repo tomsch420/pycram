@@ -189,24 +189,6 @@ class LocalTransformer(Buffer):
         new_pose = self.transform(copy_pose, target_frame)
         return new_pose
 
-    # def lookup_transform_from_source_to_target_frame(self, source_frame: str, target_frame: str,
-    #                                                  time: Optional[Time] = None) -> Transform:
-    #     """
-    #     Update the transforms for all world objects then Look up for the latest known transform that transforms a point
-    #      from source frame_id to target frame_id. If no time is given the last common time between the two frames is used.
-    #
-    #     :param source_frame: The frame_id in which the point is currently represented
-    #     :param target_frame: The frame_id in which the point should be represented
-    #     :param time: Time at which the transform should be looked up
-    #     :return: The transform from source_frame to target_frame
-    #     """
-    #     objects = list(map(self.get_object_from_frame, [source_frame, target_frame]))
-    #     self.update_transforms_for_objects([obj for obj in objects if obj is not None])
-    #
-    #     tf_time = time if time else self.get_latest_common_time(source_frame, target_frame)
-    #     translation, rotation = self.lookup_transform(source_frame, target_frame, tf_time)
-    #     return Transform(translation, rotation, source_frame, target_frame)
-
     def get_all_frames(self) -> List[str]:
         """
         :return: A list of all known coordinate frames as a list with human-readable entries.

@@ -1,3 +1,5 @@
+import os
+
 from typing_extensions import Optional, List, Union
 
 from .geometry import Shape, Box, Mesh, Cylinder
@@ -7,6 +9,7 @@ from urdf_parser_py import urdf
 
 from ..datastructures.dataclasses import Color
 from ..datastructures.enums import JointType, AxisIdentifier
+from ..ros import get_ros_package_path
 from ..utils import suppress_stdout_stderr
 
 joint_type_map = {'unknown': JointType.UNKNOWN,
@@ -117,8 +120,17 @@ class URDFParser:
     def parse_mesh(self, mesh: urdf.Mesh, shape: Union[urdf.Visual, urdf.Collision], link: urdf.Link) -> Mesh:
 
         scale = Vector3(*mesh.scale) if mesh.scale else Vector3(1., 1., 1.)
+        filename: str = mesh.filename
 
-        return Mesh(filename=mesh.filename, scale=scale,
+        if filename.startswith("package://"):
+            package_name = filename.split('//')
+            package_name = package_name[1].split('/')
+            path = get_ros_package_path(package_name[0])
+            filename = filename.replace("package://" + package_name[0], path)
+        elif filename.startswith("file://"):
+            filename = filename.replace("file://", './')
+
+        return Mesh(filename=filename, scale=scale,
                     origin=self.as_pose_stamped(self.urdf_pose_to_pose(shape.origin), link))
 
     def parse_cylinder(self, cylinder: urdf.Cylinder, shape: Union[urdf.Visual, urdf.Collision], link: urdf.Link) -> Cylinder:

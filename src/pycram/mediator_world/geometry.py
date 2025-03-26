@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from abc import ABC
 from dataclasses import dataclass, field
-from functools import lru_cache
+from functools import lru_cache, cached_property
 
+import trimesh
 from visualization_msgs.msg import Marker
 
 from ..datastructures.dataclasses import Color
@@ -48,7 +49,11 @@ class Mesh(Shape):
     """
     A mesh shape.
     """
+
     filename: str = ""
+    """
+    Filename of the mesh.
+    """
 
     scale: Vector3 = field(default_factory=Vector3)
     """
@@ -62,6 +67,13 @@ class Mesh(Shape):
         marker.mesh_use_embedded_materials = True
         marker.scale = self.scale.ros_message()
         return marker
+
+    @cached_property
+    def mesh(self) -> trimesh.Trimesh:
+        """
+        The mesh object.
+        """
+        return trimesh.load_mesh(self.filename)
 
 
 @dataclass
