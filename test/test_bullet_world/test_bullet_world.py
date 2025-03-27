@@ -14,17 +14,19 @@ class BulletWorldTestCase(unittest.TestCase):
 
     def test_creation(self):
 
-
-        file = "resources/objects/table.urdf"
+        file = "resources/robots/pr2.urdf"
         file = os.path.join(get_ros_package_path("pycram"), file)
         parsed = URDFParser(file).parse()
 
         world = BulletWorld(render_mode=WorldMode.GUI)
         world.add_from_world(parsed)
 
-        world.create_multi_body(world.get_link_by_name("left_front_leg"))
+        for joint in world.joints:
+            print(joint.axis.to_list())
 
-        time.sleep(1)
+        #world.create_multi_body(world.get_link_by_name("base_footprint"))
+
+        time.sleep(100)
 
 
 

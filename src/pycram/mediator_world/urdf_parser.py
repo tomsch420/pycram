@@ -70,14 +70,14 @@ class URDFParser:
         return result
 
     def parse_joint_axis(self, axis) -> JointAxis:
-        result = JointAxis(0)
+        result = JointAxis.X
         if axis:
             if axis[0]:
-                result |= JointAxis.X
+                result = JointAxis.X
             elif axis[1]:
-                result |= JointAxis.Y
-            else:
-                result |= JointAxis.Z
+                result = JointAxis.Y
+            elif axis[2]:
+                result = JointAxis.Z
         return result
 
     def visual_of_link(self, link: urdf.Link) -> List[Shape]:

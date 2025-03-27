@@ -81,10 +81,10 @@ class Link(WorldEntity):
         """
         Returns all links that are child links of this link, recursively.
         """
-        child_links = self.child_links
-        for child_link in child_links:
-            child_links += child_link.recursive_child_links
-        return child_links
+        result = self.child_links
+        for child_link in self.child_links:
+            result += child_link.recursive_child_links
+        return result
 
     @property
     def parent_link(self):

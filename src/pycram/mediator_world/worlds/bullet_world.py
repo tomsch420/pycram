@@ -14,6 +14,7 @@ import pycram_bullet as p
 
 from ..pose import PoseStamped
 from ...config.world_conf import WorldConfig
+from ...datastructures.dataclasses import MultiBody
 from ...datastructures.enums import WorldMode
 from ...ros import loginfo
 from ...datastructures.enums import JointType
@@ -66,17 +67,17 @@ class BulletWorld(World):
 
     def create_multi_body(self, root: Link):
         all_links = [root] + root.recursive_child_links
-
         link_to_collision_indices = {link: [self.create_collision_shape(link, shape) for shape in link.collision]
-                                     for link in all_links}
+        if link.collision else [-1] for link in all_links}
 
         links_in_parent_frames = {link: self._transformer.transform_pose(link.origin, self.origin, link.parent_link)
                                           for link in all_links[1:]}
-        links_in_parent_frames[root] = root.origin
+        links_in_parent_frames[root] = PoseStamped()
 
         link_parent_indices = [0] + [link_to_collision_indices[link.parent_link][0] for link in all_links[1:]]
         link_joint_types = [0 for _ in link_parent_indices]
         link_joint_axis = [0 for _ in link_parent_indices]
+
 
         for link in all_links:
             for joint in link.joints:
@@ -84,13 +85,22 @@ class BulletWorld(World):
                 link_joint_types[child_index] = joint_type_translation[joint.type]
                 link_joint_axis[child_index] = joint.axis.to_list()
 
+        # multi_body = MultiBody(
+        #     base_visual_shape_index=-1,
+        #     base_pose=root.origin,
+        #     link_visual_shape_indices=[-1] * len(all_links)
+        # )
+        print(link_joint_axis)
         p.createMultiBody(baseMass=1.,
                           baseCollisionShapeIndex=-1,
                           basePosition=root.origin.position.to_list(),
                           baseOrientation=root.origin.orientation.to_list(),
                           linkMasses=[1. for _ in all_links],
-                          linkCollisionShapeIndices=[link_to_collision_indices[link] for link in all_links],
+                          linkVisualShapeIndices=[-1 for _ in all_links],
+                          linkCollisionShapeIndices=[link_to_collision_indices[link][0] for link in all_links],
                           linkPositions=[links_in_parent_frames[link].position.to_list() for link in all_links],
+                          linkInertialFramePositions=[links_in_parent_frames[link].position.to_list() for link in all_links],
+                          linkInertialFrameOrientations=[links_in_parent_frames[link].orientation.to_list() for link in all_links],
                           linkOrientations=[links_in_parent_frames[link].orientation.to_list() for link in all_links],
                           linkParentIndices=link_parent_indices,
                           linkJointTypes=link_joint_types,
