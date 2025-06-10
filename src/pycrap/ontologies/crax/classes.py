@@ -3,6 +3,9 @@ from owlready2 import Imp
 from .dependencies import *
 
 
+class PhysicalObject(Base):
+    ...
+
 class World(Base):
     """
     The world could be the belief state of an agent about the world.
@@ -15,7 +18,7 @@ class Floor(Base):
     """
 
 
-class Milk(Base):
+class Milk(PhysicalObject):
     """
     A milk carton.
     """
@@ -135,8 +138,6 @@ class Link(Base):
     ...
 
 
-class PhysicalObject(Base):
-    ...
 
 
 class PouringTool(PhysicalObject):

@@ -1081,6 +1081,7 @@ class MoveAndPickUpAction(ActionDescription):
     def plan(self):
         NavigateAction(self.standing_position, self.keep_joint_states).perform()
         FaceAtAction(self.object_designator.pose, self.keep_joint_states).perform()
+        ParkArmsAction(Arms.BOTH).perform()
         PickUpAction(self.object_designator, self.arm, self.grasp_description).perform()
 
     def validate(self, result: Optional[Any] = None, max_wait_time: Optional[timedelta] = None):

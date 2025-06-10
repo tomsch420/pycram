@@ -1,29 +1,37 @@
 import enum
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Type
 
+from ormatic.utils import recursive_subclasses
 from probabilistic_model.distributions import SymbolicDistribution
-from probabilistic_model.probabilistic_circuit.nx.helper import fully_factorized, leaf
+from probabilistic_model.probabilistic_circuit.nx.helper import fully_factorized
 from probabilistic_model.probabilistic_circuit.nx.probabilistic_circuit import ProbabilisticCircuit, SumUnit, \
-    ProductUnit
+    ProductUnit, leaf
 from probabilistic_model.utils import MissingDict
 from random_events.product_algebra import SimpleEvent
 from random_events.set import Set
 from random_events.variable import Symbolic, Continuous
 from sqlalchemy import select
+from sqlalchemy.orm import aliased
 from typing_extensions import Optional, List
 
+from pycrap.ontologies import PhysicalObject
 from ...action_designator import MoveAndPickUpAction
-from ....datastructures.dataclasses import BoundingBox
-from ....datastructures.enums import Arms, Grasp
+from ....datastructures.dataclasses import BoundingBox, FrozenObject
+from ....datastructures.enums import Arms, Grasp, TaskStatus
 from ....datastructures.grasp import GraspDescription
 from ....datastructures.partial_designator import PartialDesignator
-from ....datastructures.pose import PoseStamped
+from ....datastructures.pose import PoseStamped, Pose, Vector3
 from ....datastructures.world import World
 from ....parameterizer import collision_free_event
+from ....plan import ResolvedActionNode
 from ....utils import classproperty
 from ....world_concepts.world_object import Object
 
+
+def make_object_type_variable():
+    all_leaf_classes = [cls for cls in recursive_subclasses(PhysicalObject) if len(cls.__subclasses__()) == 0]
+    return Symbolic("object_type", Set.from_iterable(all_leaf_classes))
 
 class Variables(enum.Enum):
     """
@@ -35,29 +43,40 @@ class Variables(enum.Enum):
         return [v.value for v in cls]
 
 
+class SpatialVariables(Variables):
+    x = Continuous("x")
+    y = Continuous("y")
+    z = Continuous("z")
+
+class TaskVariables(Variables):
+    status = Symbolic("status", Set.from_iterable(TaskStatus))
+
+class ObjectVariables(Variables):
+    object_type = make_object_type_variable()
+
+@dataclass
 class ProbabilisticAction:
     """
     Abstract class for performables that have a probabilistic parametrization.
     """
 
-    policy: ProbabilisticCircuit
+    policy: Optional[ProbabilisticCircuit] = None
     """
     The policy that is used to determine the parameters.
     """
 
-    variables: Type[Variables]
+    variables: Type[Variables] = field(init=False, default=Variables)
 
-    def __init__(self, policy: Optional[ProbabilisticCircuit] = None):
-        if policy is None:
-            policy = self.default_policy()
-        self.policy = policy
+    def __post_init__(self):
+        if self.policy is None:
+            self.policy = self.default_policy()
 
     def default_policy(self) -> ProbabilisticCircuit:
         """
         :return: The default policy for the action.
         """
         means = {v: 0 for v in self.variables.all() if v.is_numeric}
-        variances = {v: 1 for v in self.variables.all() if v.is_numeric}
+        variances = {v: 0.5 for v in self.variables.all() if v.is_numeric}
         model = fully_factorized(self.variables.all(), means, variances)
         return model
 
@@ -81,9 +100,11 @@ class MoveAndPickUpParameterizer(ProbabilisticAction):
     Action that moves the agent to an object and picks it up using probability tools to parameterize.
     """
 
+    partial: PartialDesignator[MoveAndPickUpAction] = field(init=True, default=None)
+
     variables = MoveAndPickUpVariables
 
-    partial: PartialDesignator[MoveAndPickUpAction]
+
 
     def collision_free_condition_for_object(self, obj: Object):
         search_space_size = 1.
@@ -97,7 +118,7 @@ class MoveAndPickUpParameterizer(ProbabilisticAction):
         return navigate_conditions
 
     def accessing_distribution_for_object(self, obj: Object, object_variable: Symbolic) -> ProbabilisticCircuit:
-        model = self.default_policy()
+        model = self.policy
 
         # add object distribution her
         p_object = SymbolicDistribution(object_variable, MissingDict(float, {obj.id: 1.}))
@@ -116,7 +137,7 @@ class MoveAndPickUpParameterizer(ProbabilisticAction):
         # apply grasp conditions
         grasp_condition = SimpleEvent(
             {self.variables.approach_direction.value: [Grasp.FRONT, Grasp.BACK, Grasp.LEFT, Grasp.RIGHT],
-                self.variables.vertical_alignment.value: [Grasp.TOP, Grasp.BOTTOM], }).as_composite_set()
+             self.variables.vertical_alignment.value: [Grasp.TOP, Grasp.BOTTOM], }).as_composite_set()
         grasp_condition.fill_missing_variables(model.variables)
         condition &= grasp_condition
 
@@ -125,7 +146,7 @@ class MoveAndPickUpParameterizer(ProbabilisticAction):
         arm_condition.fill_missing_variables(model.variables)
         condition &= arm_condition
 
-        conditional, prob = model.conditional(condition)
+        conditional, prob = model.truncated(condition)
 
         return conditional
 
@@ -176,7 +197,51 @@ class MoveAndPickUpParameterizer(ProbabilisticAction):
     def create_action(self):
         return self.create_actions(100)[0]
 
-    def query_for_database(self):
-        select(
+    @classproperty
+    def orm_query(cls):
 
+        # Create aliases for the related tables
+        standing_pose = aliased(PoseStamped)
+        standing_pose_pose = aliased(Pose)
+        standing_position = aliased(Vector3)
+
+        object_pose = aliased(PoseStamped)
+        object_pose_pose = aliased(Pose)
+        object_position = aliased(Vector3)
+
+        # Query to select the relative distance between MoveAndPickUpAction.standing_position and FrozenObject.pose
+        query = (
+            select(
+                MoveAndPickUpAction.robot_type,
+                MoveAndPickUpAction.arm,
+                MoveAndPickUpAction.keep_joint_states,
+                # Calculate X component of relative distance
+                (standing_position.x - object_position.x).label('x'),
+                # Calculate Y component of relative distance
+                (standing_position.y - object_position.y).label('y'),
+                FrozenObject.concept,
+                GraspDescription.vertical_alignment,
+                GraspDescription.rotate_gripper,
+                GraspDescription.approach_direction,
+                ResolvedActionNode.status  # Added status of ResolvedActionNode
+            ).
+            select_from(MoveAndPickUpAction).
+            join(standing_pose, MoveAndPickUpAction.standing_position_id == standing_pose.id).
+            join(standing_pose_pose, standing_pose.pose_id == standing_pose_pose.id).
+            join(standing_position, standing_pose_pose.position_id == standing_position.id).
+            join(FrozenObject, MoveAndPickUpAction.object_at_execution_id == FrozenObject.id).
+            join(object_pose, FrozenObject.pose_id == object_pose.id).
+            join(object_pose_pose, object_pose.pose_id == object_pose_pose.id).
+            join(object_position, object_pose_pose.position_id == object_position.id).
+            join(GraspDescription).
+            join(ResolvedActionNode, MoveAndPickUpAction.id == ResolvedActionNode.designator_ref_id)
+        # Join with ResolvedActionNode
         )
+        return query
+
+    def fit_model(self):
+        from probabilistic_model.learning.jpt.variables import infer_variables_from_dataframe
+
+
+        variables = infer_variables_from_dataframe()
+
