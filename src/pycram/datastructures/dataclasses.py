@@ -6,10 +6,12 @@ from abc import ABC, abstractmethod
 from copy import deepcopy, copy
 from dataclasses import dataclass, fields, field
 from enum import Enum
+from typing import Iterator
 
 import numpy as np
 import plotly.graph_objects as go
 import trimesh
+from evdev.ecodes import KEY_T
 from matplotlib import pyplot as plt
 
 from random_events.interval import closed, SimpleInterval, Bound
@@ -600,7 +602,7 @@ class BoundingBox:
         """
         if self.width > self.depth:
             logwarn_once("The width of the bounding box is greater than the depth. This means the object's"
-                         "axis alignment is potentially going against IAI conventions.")
+                         " axis alignment is potentially going against IAI conventions.")
         return [self.depth, self.width, self.height]
 
     @staticmethod
@@ -621,6 +623,25 @@ class BoundingBox:
 
         plt.show()
 
+    def as_collection(self) -> BoundingBoxCollection:
+        """
+        Convert the bounding box to a collection of bounding boxes.
+
+        :return: The bounding box as a collection
+        """
+        return BoundingBoxCollection([self])
+
+    def bloat(self, x_amount: float = 0., y_amount: float = 0, z_amount: float = 0) -> BoundingBox:
+        """
+        Bloat the axis-aligned bounding box by a given amount in all dimensions.
+
+        :param x_amount: The amount to bloat the x-coordinate
+        :param y_amount: The amount to bloat the y-coordinate
+        :param z_amount: The amount to bloat the z-coordinate
+        :return: The bloated axis-aligned bounding box
+        """
+        return BoundingBox(self.min_x - x_amount, self.min_y - y_amount, self.min_z - z_amount,
+                           self.max_x + x_amount, self.max_y + y_amount, self.max_z + z_amount)
 
 @dataclass
 class AxisAlignedBoundingBox(BoundingBox):
@@ -674,6 +695,19 @@ class AxisAlignedBoundingBox(BoundingBox):
         return AxisAlignedBoundingBox(self.min_x + shift.x, self.min_y + shift.y, self.min_z + shift.z,
                                       self.max_x + shift.x, self.max_y + shift.y, self.max_z + shift.z)
 
+    def bloat(self, x_amount: float = 0., y_amount: float = 0, z_amount: float = 0) -> AxisAlignedBoundingBox:
+        """
+        Bloat the axis-aligned bounding box by a given amount in all dimensions.
+
+        :param x_amount: The amount to bloat the x-coordinate
+        :param y_amount: The amount to bloat the y-coordinate
+        :param z_amount: The amount to bloat the z-coordinate
+        :return: The bloated axis-aligned bounding box
+        """
+        return AxisAlignedBoundingBox(self.min_x - x_amount, self.min_y - y_amount, self.min_z - z_amount,
+                                      self.max_x + x_amount, self.max_y + y_amount, self.max_z + z_amount)
+
+
 
 @dataclass
 class RotatedBoundingBox(BoundingBox):
@@ -717,6 +751,44 @@ class RotatedBoundingBox(BoundingBox):
             transformed_points = self.transform.apply_transform_to_array_of_points(points_array).tolist()
             self._points = [Point(**dict(zip(["x", "y", "z"], point))) for point in transformed_points]
         return self._points
+
+@dataclass
+class BoundingBoxCollection:
+    """
+    Dataclass for storing a collection of bounding boxes.
+    """
+    bounding_boxes: List[BoundingBox] = field(default_factory=list)
+
+    def __iter__(self) -> Iterator[BoundingBox]:
+        return iter(self.bounding_boxes)
+
+    @property
+    def event(self) -> Event:
+        """
+        :return: The bounding boxes as a random event.
+        """
+        return Event(*[box.simple_event for box in self.bounding_boxes])
+
+    def merge(self, other: BoundingBoxCollection) -> BoundingBoxCollection:
+        """
+        Merge another bounding box collection into this one.
+
+        :param other: The other bounding box collection.
+        :return: The merged bounding box collection.
+        """
+        return BoundingBoxCollection(self.bounding_boxes + other.bounding_boxes)
+
+    def bloat(self, x_amount: float = 0., y_amount: float = 0, z_amount: float = 0) -> BoundingBoxCollection:
+        """
+        Bloat all bounding boxes in the collection by a given amount in all dimensions.
+
+        :param x_amount: The amount to bloat the x-coordinate
+        :param y_amount: The amount to bloat the y-coordinate
+        :param z_amount: The amount to bloat the z-coordinate
+
+        :return: The bloated bounding box collection
+        """
+        return BoundingBoxCollection([box.bloat(x_amount, y_amount, z_amount) for box in self.bounding_boxes])
 
 
 @dataclass

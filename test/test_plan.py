@@ -223,9 +223,11 @@ class AlgebraTest(BulletWorldTestCase):
             p.get_variable("NavigateAction_1.target_location.pose.orientation.z"): 0,
             p.get_variable("NavigateAction_1.target_location.pose.orientation.w"): 1
         }
+
         distribution, _ = distribution.conditional(navigate_condition)
 
         condition &= p.create_restrictions().as_composite_set()
+
         conditional, p_c = distribution.truncated(condition)
 
         for i in range(10):

@@ -25,7 +25,7 @@ from ..tf_transformations import quaternion_from_euler
 from typing_extensions import List, Union, Optional, Type, Dict, Any, Iterable
 
 from pycrap.ontologies import Location, PhysicalObject
-from .location_designator import CostmapLocation
+from .location_designator import CostmapLocation, ProbabilisticCostmapLocation
 from .motion_designator import MoveJointsMotion, MoveGripperMotion, MoveTCPMotion, MoveMotion, \
     LookingMotion, DetectingMotion, OpeningMotion, ClosingMotion
 from ..datastructures.grasp import GraspDescription
@@ -663,9 +663,9 @@ class TransportAction(ActionDescription):
     def plan(self) -> None:
         robot_desig_resolved = BelieveObject(names=[RobotDescription.current_robot_description.name]).resolve()
         ParkArmsActionDescription(Arms.BOTH).perform()
-        pickup_loc = CostmapLocation(target=self.object_designator,
+        pickup_loc = ProbabilisticCostmapLocation(target=self.object_designator,
                                      reachable_for=robot_desig_resolved,
-                                     reachable_arm=[self.arm])
+                                     reachable_arm=self.arm)
         # Tries to find a pick-up position for the robot that uses the given arm
         pickup_pose = pickup_loc.resolve()
         if not pickup_pose:
@@ -675,20 +675,33 @@ class TransportAction(ActionDescription):
         NavigateActionDescription(pickup_pose, True).perform()
         PickUpActionDescription(self.object_designator, pickup_pose.arm,
                      grasp_description=pickup_pose.grasp_description).perform()
+        rotation_agnostic = True
         ParkArmsActionDescription(Arms.BOTH).perform()
         try:
-            place_loc = CostmapLocation(
+            place_loc = ProbabilisticCostmapLocation(
                 target=self.target_location,
                 reachable_for=robot_desig_resolved,
+                visible_for=robot_desig_resolved,
                 reachable_arm=[pickup_pose.arm],
                 grasp_descriptions=[pickup_pose.grasp_description],
-                object_in_hand=self.object_designator
+                object_in_hand=self.object_designator,
+                rotation_agnostic=rotation_agnostic,
             ).resolve()
         except StopIteration:
             raise ReachabilityFailure(
-                f"No location found from where the robot can reach the target location: {self.target_location}")
+                self.object_designator, robot_desig_resolved, pickup_pose.arm, pickup_pose.grasp_description)
         NavigateActionDescription(place_loc, True).perform()
-        PlaceActionDescription(self.object_designator, self.target_location, self.arm).perform()
+
+        if rotation_agnostic:
+            robot_rotation = robot_desig_resolved.get_pose().orientation
+            self.target_location.orientation = robot_rotation
+            approach_direction = GraspDescription(pickup_pose.grasp_description.approach_direction, None, False)
+            side_grasp = robot_desig_resolved.robot_description.get_arm_chain(pickup_pose.arm).end_effector.grasps[approach_direction]
+            side_grasp = [(-x, -y, -z, w) for x, y, z, w in zip(*[iter(side_grasp)] * 4)]
+            side_grasp = [elem for quat in side_grasp for elem in quat]
+            self.target_location.rotate_by_quaternion(side_grasp)
+
+        PlaceActionDescription(self.object_designator, self.target_location, pickup_pose.arm).perform()
         ParkArmsActionDescription(Arms.BOTH).perform()
 
     def validate(self, result: Optional[Any] = None, max_wait_time: Optional[timedelta] = None):

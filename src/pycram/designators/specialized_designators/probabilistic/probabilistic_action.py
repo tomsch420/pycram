@@ -111,7 +111,7 @@ class MoveAndPickUpParameterizer(ProbabilisticAction):
                                    min_z=obj.pose.position.z - search_space_size,
                                    max_x=obj.pose.position.x + search_space_size,
                                    max_y=obj.pose.position.y + search_space_size,
-                                   max_z=obj.pose.position.z + search_space_size)
+                                   max_z=obj.pose.position.z + search_space_size).as_collection()
         navigate_conditions = collision_free_event(obj.world, search_space)
         return navigate_conditions
 
