@@ -11,9 +11,7 @@ from typing import Iterator
 import numpy as np
 import plotly.graph_objects as go
 import trimesh
-from evdev.ecodes import KEY_T
 from matplotlib import pyplot as plt
-
 from random_events.interval import closed, SimpleInterval, Bound
 from random_events.product_algebra import SimpleEvent, Event
 from random_events.variable import Continuous
@@ -21,10 +19,9 @@ from typing_extensions import List, Optional, Tuple, Callable, Dict, Any, Union,
     deprecated, Type
 
 from pycrap.ontologies import PhysicalObject
-from .enums import JointType, Shape, VirtualMobileBaseJointName, Grasp, AxisIdentifier
+from .enums import JointType, Shape, VirtualMobileBaseJointName, Grasp
 from .pose import PoseStamped, Point, TransformStamped
-from ..ros import logwarn, logwarn_once
-from ..utils import classproperty
+from ..ros import logwarn_once
 from ..validation.error_checkers import calculate_joint_position_error, is_error_acceptable
 
 if TYPE_CHECKING:
@@ -32,7 +29,6 @@ if TYPE_CHECKING:
     from ..world_concepts.world_object import Object
     from ..world_concepts.constraints import Attachment
     from .world_entity import PhysicalBody
-    from .world import World
 
 
 @dataclass
@@ -643,6 +639,7 @@ class BoundingBox:
         return BoundingBox(self.min_x - x_amount, self.min_y - y_amount, self.min_z - z_amount,
                            self.max_x + x_amount, self.max_y + y_amount, self.max_z + z_amount)
 
+
 @dataclass
 class AxisAlignedBoundingBox(BoundingBox):
 
@@ -708,7 +705,6 @@ class AxisAlignedBoundingBox(BoundingBox):
                                       self.max_x + x_amount, self.max_y + y_amount, self.max_z + z_amount)
 
 
-
 @dataclass
 class RotatedBoundingBox(BoundingBox):
     """
@@ -751,6 +747,7 @@ class RotatedBoundingBox(BoundingBox):
             transformed_points = self.transform.apply_transform_to_array_of_points(points_array).tolist()
             self._points = [Point(**dict(zip(["x", "y", "z"], point))) for point in transformed_points]
         return self._points
+
 
 @dataclass
 class BoundingBoxCollection:
@@ -1542,7 +1539,7 @@ class RayResult:
         Check if the ray intersects with a body.
         return: Whether the ray intersects with a body.
         """
-        #if not self.obj_id:
+        # if not self.obj_id:
         #    logwarn("obj_id should be available to check if the ray intersects with a body,"
         #            "It appears that the ray result is not valid.")
         return self.obj_id != -1
@@ -1611,10 +1608,8 @@ class ReasoningResult:
     reasoned_parameter: Dict[str, Any] = field(default_factory=dict)
 
 
-
 @dataclass
 class FrozenObject:
-
     name: str
     """
     Name of this Object

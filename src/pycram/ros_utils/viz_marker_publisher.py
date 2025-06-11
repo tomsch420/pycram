@@ -104,7 +104,7 @@ class VizMarkerPublisher:
                     else:
                         link_origin = TransformStamped.from_list()
                     link_pose_with_origin = link_pose * link_origin
-                    msg.pose = link_pose_with_origin.to_pose_stamped().pose
+                    msg.pose = link_pose_with_origin.to_pose_stamped().pose.ros_message()
 
                     color = obj.get_link_color(link).get_rgba()
 
@@ -275,7 +275,7 @@ class ManualMarkerPublisher:
         # new_marker.header.stamp = Time.now()
         new_marker.type = marker_type
         new_marker.action = Marker.ADD
-        new_marker.pose = marker_pose.pose
+        new_marker.pose = marker_pose.pose.ros_message()
         new_marker.scale.x = marker_scales[0]
         new_marker.scale.y = marker_scales[1]
         new_marker.scale.z = marker_scales[2]
@@ -305,7 +305,7 @@ class ManualMarkerPublisher:
         for marker in self.marker_array.markers:
             if marker.id == marker_id:
                 # Update successful
-                marker.pose = new_pose
+                marker.pose = new_pose.ros_message() if hasattr(new_pose, 'ros_message') else new_pose
                 self.log_message = f"Marker '{marker.ns}' updated"
                 self.marker_array_pub.publish(self.marker_array)
                 return True
@@ -440,11 +440,11 @@ class BoundingBoxPublisher:
             marker.lifetime = Duration(duration)
 
             marker.pose = Pose()
-            marker.pose.position = origin
+            marker.pose.position = origin.ros_message() if hasattr(origin, 'ros_message') else origin
 
-            marker.scale.x = box.depth
-            marker.scale.y = box.width
-            marker.scale.z = box.height
+            marker.scale.x = float(box.depth)
+            marker.scale.y = float(box.width)
+            marker.scale.z = float(box.height)
 
             marker.color.r = 1.0
             marker.color.g = 0.0
@@ -494,11 +494,11 @@ class AxisMarkerPublisher:
 
         for pose in self.poses:
             self._create_line(pose, AxisIdentifier.X.value, self.duration, self.length,
-                              Color.from_rgb([1, 0, 0]))
+                              Color.from_rgb([1., 0., 0.]))
             self._create_line(pose, AxisIdentifier.Y.value, self.duration, self.length,
-                              Color.from_rgb([0, 1, 0]))
+                              Color.from_rgb([0., 1., 0.]))
             self._create_line(pose, AxisIdentifier.Z.value, self.duration, self.length,
-                              Color.from_rgb([0, 0, 1]))
+                              Color.from_rgb([0., 0., 1.]))
 
         if self.thread.is_alive():
             self.thread.join()
@@ -622,7 +622,7 @@ class AxisMarkerPublisher:
         for marker in self.marker_array.markers:
             if marker.id == marker_id:
                 # Update successful
-                marker.pose = new_pose
+                marker.pose = new_pose.ros_message() if hasattr(new_pose, 'ros_message') else new_pose
                 # rospy.logdebug(f"Marker {marker_id} updated")
                 self.marker_pub.publish(self.marker_array)
                 return True
