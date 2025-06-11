@@ -104,8 +104,6 @@ class MoveAndPickUpParameterizer(ProbabilisticAction):
 
     variables = MoveAndPickUpVariables
 
-
-
     def collision_free_condition_for_object(self, obj: Object):
         search_space_size = 1.
         search_space = BoundingBox(min_x=obj.pose.position.x - search_space_size,
@@ -219,7 +217,7 @@ class MoveAndPickUpParameterizer(ProbabilisticAction):
                 (standing_position.x - object_position.x).label('x'),
                 # Calculate Y component of relative distance
                 (standing_position.y - object_position.y).label('y'),
-                FrozenObject.concept,
+                FrozenObject.concept.label("object_type"),
                 GraspDescription.vertical_alignment,
                 GraspDescription.rotate_gripper,
                 GraspDescription.approach_direction,
