@@ -12,6 +12,7 @@ import numpy as np
 import plotly.graph_objects as go
 import trimesh
 from matplotlib import pyplot as plt
+
 from random_events.interval import closed, SimpleInterval, Bound
 from random_events.product_algebra import SimpleEvent, Event
 from random_events.variable import Continuous
@@ -21,7 +22,7 @@ from typing_extensions import List, Optional, Tuple, Callable, Dict, Any, Union,
 from pycrap.ontologies import PhysicalObject
 from .enums import JointType, Shape, VirtualMobileBaseJointName, Grasp
 from .pose import PoseStamped, Point, TransformStamped
-from ..ros import logwarn_once
+from ..ros import logwarn, logwarn_once
 from ..validation.error_checkers import calculate_joint_position_error, is_error_acceptable
 
 if TYPE_CHECKING:
@@ -629,15 +630,15 @@ class BoundingBox:
 
     def bloat(self, x_amount: float = 0., y_amount: float = 0, z_amount: float = 0) -> BoundingBox:
         """
-        Bloat the axis-aligned bounding box by a given amount in all dimensions.
+        Bloat the bounding box by a given amount in all dimensions.
 
-        :param x_amount: The amount to bloat the x-coordinate
-        :param y_amount: The amount to bloat the y-coordinate
-        :param z_amount: The amount to bloat the z-coordinate
-        :return: The bloated axis-aligned bounding box
+        :param x_amount: The amount to adjust minimum and maximum x-coordinates
+        :param y_amount: The amount to adjust minimum and maximum y-coordinates
+        :param z_amount: The amount to adjust minimum and maximum z-coordinates
+        :return: New bloated bounding box
         """
-        return BoundingBox(self.min_x - x_amount, self.min_y - y_amount, self.min_z - z_amount,
-                           self.max_x + x_amount, self.max_y + y_amount, self.max_z + z_amount)
+        return self.__class__(self.min_x - x_amount, self.min_y - y_amount, self.min_z - z_amount,
+                              self.max_x + x_amount, self.max_y + y_amount, self.max_z + z_amount)
 
 
 @dataclass
@@ -691,18 +692,6 @@ class AxisAlignedBoundingBox(BoundingBox):
         """
         return AxisAlignedBoundingBox(self.min_x + shift.x, self.min_y + shift.y, self.min_z + shift.z,
                                       self.max_x + shift.x, self.max_y + shift.y, self.max_z + shift.z)
-
-    def bloat(self, x_amount: float = 0., y_amount: float = 0, z_amount: float = 0) -> AxisAlignedBoundingBox:
-        """
-        Bloat the axis-aligned bounding box by a given amount in all dimensions.
-
-        :param x_amount: The amount to bloat the x-coordinate
-        :param y_amount: The amount to bloat the y-coordinate
-        :param z_amount: The amount to bloat the z-coordinate
-        :return: The bloated axis-aligned bounding box
-        """
-        return AxisAlignedBoundingBox(self.min_x - x_amount, self.min_y - y_amount, self.min_z - z_amount,
-                                      self.max_x + x_amount, self.max_y + y_amount, self.max_z + z_amount)
 
 
 @dataclass
@@ -779,9 +768,9 @@ class BoundingBoxCollection:
         """
         Bloat all bounding boxes in the collection by a given amount in all dimensions.
 
-        :param x_amount: The amount to bloat the x-coordinate
-        :param y_amount: The amount to bloat the y-coordinate
-        :param z_amount: The amount to bloat the z-coordinate
+        :param x_amount: The amount to adjust the x-coordinates
+        :param y_amount: The amount to adjust the y-coordinates
+        :param z_amount: The amount to adjust the z-coordinates
 
         :return: The bloated bounding box collection
         """
