@@ -44,7 +44,7 @@ class MoveAndPickUpTestCase(EmptyBulletWorldTestCase):
     def test_orm(self):
         odd = ObjectDesignatorDescription(types=[Milk])
         mpa_description = MoveAndPickUpActionDescription(None, odd, None, None, None)
-        mpa = MoveAndPickUpParameterizer(partial=mpa_description.root).create_action()
+        mpa = MoveAndPickUpParameterizer(partial=mpa_description.root, world=self.world).create_action()
 
         plan = Plan(ResolvedActionNode(designator_ref=mpa))
 

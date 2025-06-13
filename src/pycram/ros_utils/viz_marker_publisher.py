@@ -506,7 +506,7 @@ class CoordinateAxisPublisher:
             qx, qy, qz, qw = quaternion.to_list()
 
             # Represent axis as quaternion (x, y, z, 0)
-            axis_quat = (*axis, 0)
+            axis_quat = (*axis, 0.)
 
             q = (qx, qy, qz, qw)
             q_inverse = (-qx, -qy, -qz, qw)
@@ -553,7 +553,9 @@ class CoordinateAxisPublisher:
 
 def plot_axis_in_rviz(poses: List[PoseStamped], duration: Optional[float] = 60, length: float = 0.3):
     def make_publisher():
-        return CoordinateAxisPublisher()
+        pub = CoordinateAxisPublisher()
+        # time.sleep(0.5)
+        return pub
 
     publisher = make_publisher()
     publisher.visualize(poses, duration, length)

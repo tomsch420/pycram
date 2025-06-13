@@ -8,7 +8,7 @@ from probabilistic_model.probabilistic_circuit.nx.helper import fully_factorized
 from probabilistic_model.probabilistic_circuit.nx.probabilistic_circuit import ProbabilisticCircuit, SumUnit, \
     ProductUnit, leaf
 from probabilistic_model.utils import MissingDict
-from random_events.product_algebra import SimpleEvent
+from random_events.product_algebra import SimpleEvent, Event
 from random_events.set import Set
 from random_events.variable import Symbolic, Continuous
 from sqlalchemy import select
@@ -23,7 +23,7 @@ from ....datastructures.grasp import GraspDescription
 from ....datastructures.partial_designator import PartialDesignator
 from ....datastructures.pose import PoseStamped, Pose, Vector3
 from ....datastructures.world import World
-from ....parameterizer import collision_free_event
+from ....graph_of_convex_sets import GraphOfConvexSets
 from ....plan import ResolvedActionNode
 from ....utils import classproperty
 from ....world_concepts.world_object import Object
@@ -100,9 +100,11 @@ class MoveAndPickUpParameterizer(ProbabilisticAction):
     Action that moves the agent to an object and picks it up using probability tools to parameterize.
     """
 
-    partial: PartialDesignator[MoveAndPickUpAction] = field(init=True, default=None)
+    partial: PartialDesignator[MoveAndPickUpAction] = field(default=None)
 
     variables = MoveAndPickUpVariables
+
+    world: World = field(default=None)
 
     def collision_free_condition_for_object(self, obj: Object):
         search_space_size = 1.
@@ -112,7 +114,9 @@ class MoveAndPickUpParameterizer(ProbabilisticAction):
                                    max_x=obj.pose.position.x + search_space_size,
                                    max_y=obj.pose.position.y + search_space_size,
                                    max_z=obj.pose.position.z + search_space_size).as_collection()
-        navigate_conditions = collision_free_event(obj.world, search_space)
+        gcs = GraphOfConvexSets.navigation_map_from_world(self.world, search_space=search_space, bloat_obstacles=0.3)
+        navigate_conditions = Event(*[node.simple_event for node in gcs.nodes])
+        navigate_conditions = navigate_conditions.marginal([MoveAndPickUpVariables.x.value, MoveAndPickUpVariables.y.value,])
         return navigate_conditions
 
     def accessing_distribution_for_object(self, obj: Object, object_variable: Symbolic) -> ProbabilisticCircuit:
@@ -170,8 +174,10 @@ class MoveAndPickUpParameterizer(ProbabilisticAction):
         model = self.create_distribution()
         samples = model.sample(amount)
         ll = model.log_likelihood(samples)
-        sorted_indices = ll.argsort()
+        sorted_indices = ll.argsort()[::-1]
         samples = samples[sorted_indices][:amount]
+        # import plotly.graph_objects as go
+        # go.Figure(model.marginal([MoveAndPickUpVariables.x.value, MoveAndPickUpVariables.y.value,]).plot()).show()
 
         return [self.sample_to_action(sample, model) for sample in samples]
 

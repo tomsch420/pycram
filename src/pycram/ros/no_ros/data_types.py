@@ -1,7 +1,6 @@
 import time
 import datetime
 
-
 class Time:
     """
     Class to abstract the ROS2 Time, to make it more consistent with the ROS1 Time class.

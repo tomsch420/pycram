@@ -131,6 +131,12 @@ class Color:
     B: float = 1
     A: float = 1
 
+    def __post_init__(self):
+        self.R = float(self.R)
+        self.G = float(self.G)
+        self.B = float(self.B)
+        self.A = float(self.A)
+
     @classmethod
     def from_list(cls, color: List[float]):
         """
@@ -152,7 +158,7 @@ class Color:
 
         :param rgb: The list of RGB values
         """
-        return cls(rgb[0], rgb[1], rgb[2], 1)
+        return cls(float(rgb[0]), float(rgb[1]), float(rgb[2]), 1.)
 
     @classmethod
     def from_rgba(cls, rgba: List[float]):
